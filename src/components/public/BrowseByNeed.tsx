@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { t } from '@/lib/i18n';
 import { EMPTY_CRITERIA, browseHref, directoryHref } from '@/lib/public/filters';
-import type { NeedMenuEntry } from '@/lib/public/need-menu';
+import { railSubCategories, type NeedMenuEntry } from '@/lib/public/need-menu';
 import type { NeedKey } from '@/lib/public/types';
 
 /**
@@ -35,15 +35,13 @@ import type { NeedKey } from '@/lib/public/types';
  * can disagree with the URL. Selecting the active category again clears the
  * filter, which is the prototype's own toggle (line 3250).
  *
- * **Sub-items are a search, not a facet.** Selecting one sets the need *and*
- * the free-text query to the sub-category's own text -- the prototype sets a
- * text chip and the search draft to exactly that (line 3253). It works here
- * because `matchesQuery` in filters.ts already searches `sub_category`
- * alongside name, partner and description. So the sub-item needs no filter
- * dimension of its own: it is the same `need` + `q` pair the directory's
- * chips read and write, serialised by the same `directoryHref`, and a
- * sub-item link is therefore shareable, back-buttonable and identical to what
- * a visitor would have got by typing that phrase into the search box.
+ * **Sub-items are a real filter, not a search.** The prototype sets the
+ * search text to the sub-category's words, and this rail used to do the same.
+ * Client feedback (October 2026) was that the result could then not be read or
+ * changed from the directory's controls, so a sub-item now sets the
+ * `subCategory` facet: the same value the directory's dropdown and chip read
+ * and write, serialised by the same `directoryHref`. The selected sub-item is
+ * tinted, and selecting it again clears it, as a category does.
  *
  * **The counts beside them are not in the prototype** (its sub-items are bare
  * labels). They are added at the client's instruction, and
@@ -90,10 +88,13 @@ import type { NeedKey } from '@/lib/public/types';
 export default function BrowseByNeed({
   entries,
   activeNeed,
+  activeSubCategory = null,
 }: {
   entries: readonly NeedMenuEntry[];
   /** The need the directory is currently filtered to, if any. */
   activeNeed: NeedKey | null;
+  /** The sub-category refining it, if any. */
+  activeSubCategory?: string | null;
 }) {
   if (entries.length === 0) return null;
 
@@ -158,9 +159,9 @@ export default function BrowseByNeed({
                 //
                 // browseHref, not directoryHref: opening a category reveals
                 // its sub-categories in the menu, and the #directory fragment
-                // scrolled the viewport straight past them to the results.
-                // The sub-category rows below keep the fragment, because
-                // choosing one is a request for the resources themselves.
+                // scrolled the viewport straight past them to the results. The
+                // sub-category rows below do the same, because choosing one
+                // changes the rail beside this menu, which has to stay in view.
                 href={browseHref(isActive ? EMPTY_CRITERIA : needOnly)}
                 aria-current={isActive ? 'true' : undefined}
                 className="proto-dept-item"
@@ -249,37 +250,47 @@ export default function BrowseByNeed({
                     listStyle: 'none',
                   }}
                 >
-                  {entry.subCategories.map((sub) => (
-                    <li key={sub.label}>
-                      <Link
-                        href={directoryHref({ ...needOnly, query: sub.label })}
-                        className="proto-dept-sub"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'baseline',
-                          gap: 8,
-                          textAlign: 'left',
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          color: '#42506E',
-                          padding: '5px 8px',
-                          borderRadius: 6,
-                        }}
-                      >
-                        <span style={{ flex: 1, minWidth: 0 }}>{sub.label}</span>
-                        {/* The category row above states its count the same
-                            way: the digit alone for the eye, the unit only
-                            for a screen reader, because "3" read out on its
-                            own is three of nothing. */}
-                        <span style={{ fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
-                          <span aria-hidden="true">{sub.liveCount}</span>
-                          <span className="sr-only">
-                            {t('home.browseCount', { count: sub.liveCount })}
+                  {railSubCategories(entry, activeSubCategory).map((sub) => {
+                    const isActiveSub = sub.label === activeSubCategory;
+                    return (
+                      <li key={sub.label}>
+                        <Link
+                          href={browseHref(
+                            isActiveSub ? needOnly : { ...needOnly, subCategory: sub.label },
+                          )}
+                          aria-current={isActiveSub ? 'true' : undefined}
+                          className="proto-dept-sub"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'baseline',
+                            gap: 8,
+                            textAlign: 'left',
+                            fontSize: 12.5,
+                            // The weight is what marks it without relying on
+                            // colour. Background stays unset otherwise, because
+                            // an inline value would beat the :hover tint.
+                            fontWeight: isActiveSub ? 700 : 600,
+                            color: isActiveSub ? '#1F5FBF' : '#42506E',
+                            background: isActiveSub ? '#EEF2FB' : undefined,
+                            padding: '5px 8px',
+                            borderRadius: 6,
+                          }}
+                        >
+                          <span style={{ flex: 1, minWidth: 0 }}>{sub.label}</span>
+                          {/* The category row above states its count the same
+                              way: the digit alone for the eye, the unit only
+                              for a screen reader, because "3" read out on its
+                              own is three of nothing. */}
+                          <span style={{ fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
+                            <span aria-hidden="true">{sub.liveCount}</span>
+                            <span className="sr-only">
+                              {t('home.browseCount', { count: sub.liveCount })}
+                            </span>
                           </span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
+                        </Link>
+                      </li>
+                    );
+                  })}
                   <li>
                     {/* The prototype's "More →". It drops the sub-category and
                         keeps the need, so it is the way back to everything in

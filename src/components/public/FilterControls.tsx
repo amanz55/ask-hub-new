@@ -6,6 +6,7 @@ import { COUNTRIES, SECTORS, STAGES, NEED_KEYS } from '@/lib/reference';
 import {
   DEFAULT_SORT,
   EMPTY_CRITERIA,
+  rankTerms,
   type FilterCriteria,
   type SortMode,
 } from '@/lib/public/filters';
@@ -14,8 +15,10 @@ import { applyParsedQuery } from '@/lib/public/search-parse';
 /**
  * Transcribed from the approved prototype's directory screen: a search pill
  * with the button inside it, a line of plain-language help beneath, a row of
- * removable chips for whatever is currently filtered, and one row of four
- * dropdowns -- need, sector, stage, country.
+ * removable chips for whatever is currently filtered, and one row of
+ * dropdowns -- need, sector, stage, country, plus the sub-category dropdown
+ * beside need, which the prototype does not have. Client feedback asked for it
+ * so that a sub-category chosen in the browse rail can be seen and changed here.
  *
  * **Search runs on submit, not on every keystroke.** The prototype searches
  * only on Enter or the button, and it has to: a query is *parsed* into facets
@@ -42,11 +45,17 @@ import { applyParsedQuery } from '@/lib/public/search-parse';
  */
 export default function FilterControls({
   criteria,
+  subCategories,
   resultCount,
+  noTextMatch = false,
   onChange,
 }: {
   criteria: FilterCriteria;
+  /** What the selected need offers. Empty when no need is selected. */
+  subCategories: readonly string[];
   resultCount: number;
+  /** The search words matched nothing, so the facets alone chose these rows. */
+  noTextMatch?: boolean;
   onChange: (next: FilterCriteria) => void;
 }) {
   const [draft, setDraft] = useState(criteria.query);
@@ -97,18 +106,26 @@ export default function FilterControls({
 
   /**
    * The active facets, as the prototype's removable chip row, in the order the
-   * dropdowns below sit in so the two read as one control rather than two.
+   * dropdowns above sit in so the two read as one control rather than two.
    *
-   * The committed query gets a chip too. It is filter state like any other,
-   * and without one the only evidence of an active search would be the text in
-   * the box -- which after parsing is not the same thing at all.
+   * The committed query gets a chip too, worded as what it is: words that
+   * order the results rather than a filter on them. Without one the only
+   * evidence of an active search would be the text in the box -- which after
+   * parsing is not the same thing at all.
    */
   const activeChips: { key: string; label: string; clear: () => void }[] = [];
   if (criteria.need) {
     activeChips.push({
       key: 'need',
       label: t(`need.${criteria.need}`),
-      clear: () => onChange({ ...criteria, need: null }),
+      clear: () => onChange({ ...criteria, need: null, subCategory: null }),
+    });
+  }
+  if (criteria.subCategory) {
+    activeChips.push({
+      key: 'subCategory',
+      label: criteria.subCategory,
+      clear: () => onChange({ ...criteria, subCategory: null }),
     });
   }
   if (criteria.sector) {
@@ -204,52 +221,6 @@ export default function FilterControls({
 
       <p style={{ marginTop: 8, fontSize: 11.5, color: '#5B6B8C' }}>{t('filter.smartHint')}</p>
 
-      {/* Shown whenever anything is filtered, not merely when a chip exists: a
-          non-default sort produces no chip, and hiding "Clear all" in that
-          state would leave no way back to the default view. */}
-      {isFiltered ? (
-        <div
-          style={{
-            marginTop: 14,
-            display: 'flex',
-            gap: 8,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-          }}
-        >
-          {activeChips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={chip.clear}
-              className="proto-active-chip"
-              style={ACTIVE_CHIP}
-            >
-              {chip.label}
-              <span aria-hidden="true" style={{ fontWeight: 800, opacity: 0.6 }}>
-                ×
-              </span>
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={clearAll}
-            className="proto-clear-all"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#5B6B8C',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              padding: '6px 8px',
-            }}
-          >
-            {t('filter.clearAll')}
-          </button>
-        </div>
-      ) : null}
-
       <div
         style={{
           marginTop: 16,
@@ -269,6 +240,8 @@ export default function FilterControls({
               need: (event.target.value === ''
                 ? null
                 : event.target.value) as FilterCriteria['need'],
+              // The options below belong to the need being left.
+              subCategory: null,
             })
           }
           style={FACET_SELECT}
@@ -277,6 +250,26 @@ export default function FilterControls({
           {NEED_KEYS.map((key) => (
             <option key={key} value={key}>
               {t(`need.${key}`)}
+            </option>
+          ))}
+        </select>
+        <select
+          value={criteria.subCategory ?? ''}
+          aria-label={t('filter.subCategory')}
+          disabled={subCategories.length === 0}
+          title={criteria.need === null ? t('filter.subCategoryHint') : undefined}
+          onChange={(event) =>
+            onChange({
+              ...criteria,
+              subCategory: event.target.value === '' ? null : event.target.value,
+            })
+          }
+          style={subCategories.length === 0 ? FACET_SELECT_DISABLED : FACET_SELECT}
+        >
+          <option value="">{t('filter.anySubCategory')}</option>
+          {subCategories.map((subCategory) => (
+            <option key={subCategory} value={subCategory}>
+              {subCategory}
             </option>
           ))}
         </select>
@@ -336,6 +329,52 @@ export default function FilterControls({
         </select>
       </div>
 
+      {/* Shown whenever anything is filtered, not merely when a chip exists: a
+          non-default sort produces no chip, and hiding "Clear all" in that
+          state would leave no way back to the default view. */}
+      {isFiltered ? (
+        <div
+          style={{
+            marginTop: 14,
+            display: 'flex',
+            gap: 8,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}
+        >
+          {activeChips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={chip.clear}
+              className="proto-active-chip"
+              style={ACTIVE_CHIP}
+            >
+              {chip.label}
+              <span aria-hidden="true" style={{ fontWeight: 800, opacity: 0.6 }}>
+                ×
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={clearAll}
+            className="proto-clear-all"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#5B6B8C',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              padding: '6px 8px',
+            }}
+          >
+            {t('filter.clearAll')}
+          </button>
+        </div>
+      ) : null}
+
       <div
         style={{
           marginTop: 22,
@@ -352,6 +391,11 @@ export default function FilterControls({
             : t('directory.count', { count: resultCount })}
           {' · '}
           {t('site.curationStatement')}
+          {noTextMatch ? (
+            <div style={{ fontWeight: 400, marginTop: 4 }}>
+              {t('directory.noExactMatch', { value: criteria.query })}
+            </div>
+          ) : null}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={GROUP_LABEL}>{t('sort.label')}</span>
@@ -366,6 +410,9 @@ export default function FilterControls({
             }
             style={{ ...SELECT, fontSize: 13, padding: '7px 10px', fontWeight: 600 }}
           >
+            {rankTerms(criteria).length > 0 ? (
+              <option value="best">{t('sort.best')}</option>
+            ) : null}
             <option value="featured">{t('sort.featured')}</option>
             <option value="recent">{t('sort.recent')}</option>
           </select>
@@ -400,7 +447,7 @@ const GROUP_LABEL = {
 } as const;
 
 /**
- * The four facet dropdowns. Held apart from `SELECT` below, which is the sort
+ * The facet dropdowns. Held apart from `SELECT` below, which is the sort
  * control's: the two are different sizes in the prototype, and folding them
  * into one const would restyle a row this change does not touch.
  */
@@ -415,6 +462,17 @@ const FACET_SELECT = {
   background: '#fff',
   color: '#1A2332',
   cursor: 'pointer',
+} as const;
+
+/**
+ * White like the others: only the muted text and the cursor say it is
+ * unavailable. `opacity` undoes the fade browsers apply to a disabled select.
+ */
+const FACET_SELECT_DISABLED = {
+  ...FACET_SELECT,
+  color: '#5B6B8C',
+  cursor: 'not-allowed',
+  opacity: 1,
 } as const;
 
 const SELECT = {

@@ -118,6 +118,7 @@ describe('BrowseByNeed', () => {
   const entry = (over: Partial<NeedMenuEntry> & Pick<NeedMenuEntry, 'need'>): NeedMenuEntry => ({
     liveCount: 4,
     subCategories: [],
+    moreSubCategories: [],
     ...over,
   });
 
@@ -165,10 +166,10 @@ describe('BrowseByNeed', () => {
     expect(screen.queryByRole('link', { name: 'More' })).toBeNull();
   });
 
-  it('expands the active need, linking each sub-item to that need plus the phrase', () => {
-    // The href is the assertion that matters: it is the same need+q pair the
-    // directory's own chips read and write, so the sub-item is a real,
-    // shareable filter rather than a label.
+  it('expands the active need, linking each sub-item to that need and sub-category', () => {
+    // The href is the assertion that matters: it is the same need+sub pair the
+    // directory's own dropdown and chips read and write, so the sub-item is a
+    // real, shareable filter rather than a label.
     render(
       <BrowseByNeed
         entries={[
@@ -178,11 +179,47 @@ describe('BrowseByNeed', () => {
       />,
     );
     expect(screen.getByRole('link', { name: /Cloud credits/ }).getAttribute('href')).toBe(
-      '/?need=training&q=Cloud+credits#directory',
+      '/?need=training&sub=Cloud+credits',
     );
     expect(screen.getByRole('link', { name: /Curriculum/ }).getAttribute('href')).toBe(
-      '/?need=training&q=Curriculum#directory',
+      '/?need=training&sub=Curriculum',
     );
+  });
+
+  it('marks only the selected sub-item, and selecting it again clears it', () => {
+    render(
+      <BrowseByNeed
+        entries={[
+          entry({ need: 'training', subCategories: [sub('Cloud credits', 2), sub('Curriculum', 7)] }),
+        ]}
+        activeNeed="training"
+        activeSubCategory="Curriculum"
+      />,
+    );
+    const selected = screen.getByRole('link', { name: /Curriculum/ });
+    expect(selected.getAttribute('aria-current')).toBe('true');
+    expect(selected.getAttribute('href')).toBe('/?need=training');
+
+    const other = screen.getByRole('link', { name: /Cloud credits/ });
+    expect(other.getAttribute('aria-current')).toBeNull();
+    expect(other.getAttribute('href')).toBe('/?need=training&sub=Cloud+credits');
+  });
+
+  it('lists a selected sub-item from past the cap, and no other from there', () => {
+    // Reachable from the directory's dropdown, which offers all of them. The
+    // rail would otherwise show no selection while the directory had one.
+    const entries = [
+      entry({
+        need: 'training',
+        subCategories: [sub('Curriculum', 7)],
+        moreSubCategories: [sub('Specialisation', 3), sub('AI literacy', 5)],
+      }),
+    ];
+    render(<BrowseByNeed entries={entries} activeNeed="training" activeSubCategory="Specialisation" />);
+    expect(
+      screen.getByRole('link', { name: /Specialisation/ }).getAttribute('aria-current'),
+    ).toBe('true');
+    expect(screen.queryByRole('link', { name: /AI literacy/ })).toBeNull();
   });
 
   it('shows each sub-item\u2019s own count, announced with its unit', () => {

@@ -1,19 +1,20 @@
-import { Suspense } from 'react';
-import WelcomeBand from '@/components/public/WelcomeBand';
-import StatsBand from '@/components/public/StatsBand';
-import BrowseByNeed from '@/components/public/BrowseByNeed';
-import BrowseByNeedClient from '@/components/public/BrowseByNeedClient';
-import RecentlyAddedRail from '@/components/public/RecentlyAddedRail';
-import ResourceDirectoryStatic from '@/components/public/ResourceDirectoryStatic';
-import ResourceDirectoryClient from '@/components/public/ResourceDirectoryClient';
-import { buildNeedMenu } from '@/lib/public/need-menu';
-import { openResources } from '@/lib/public/filters';
+import { Suspense } from "react";
+import WelcomeBand from "@/components/public/WelcomeBand";
+import StatsBand from "@/components/public/StatsBand";
+import BrowseByNeed from "@/components/public/BrowseByNeed";
+import BrowseByNeedClient from "@/components/public/BrowseByNeedClient";
+import RecentlyAddedRail from "@/components/public/RecentlyAddedRail";
+import RecentlyAddedRailClient from "@/components/public/RecentlyAddedRailClient";
+import ResourceDirectoryStatic from "@/components/public/ResourceDirectoryStatic";
+import ResourceDirectoryClient from "@/components/public/ResourceDirectoryClient";
+import { buildNeedMenu } from "@/lib/public/need-menu";
+import { openResources } from "@/lib/public/filters";
 import {
   listPublicResources,
   listNeedCounts,
   listHeadlineStats,
   getSiteContent,
-} from '@/lib/public/readers';
+} from "@/lib/public/readers";
 
 /**
  * The storefront home, PRD 5.1 in order: welcome, reach strip, search,
@@ -47,16 +48,11 @@ import {
  * filtered view.
  *
  * The boundary is drawn here, around the smallest subtree that needs it, so
- * the bands above the directory still prerender as static HTML. `SearchPill`
- * in the header is a client component too, but it calls only `useRouter`, not
- * `useSearchParams`, so it prerenders in place and needs no boundary of its
- * own.
+ * the bands above the directory still prerender as static HTML.
  *
- * **The separate hero search is gone.** It was a second search box on a page
- * whose header now carries the prototype's pill, and the prototype has one
- * search above the fold, not two. PRD 5.1 item 3 asks for prominent search
- * above the fold; the sticky header satisfies it on every route rather than
- * only this one. The directory keeps its own field, exactly as the prototype
+ * **The hero and header searches are gone.** The client asked for one search
+ * box, not repeats of it, so the directory's is the only one, and it no longer
+ * sits above the fold as PRD 5.1 item 3 first asked. The directory keeps its own field, exactly as the prototype
  * does.
  */
 export default async function PublicHomePage() {
@@ -97,16 +93,16 @@ export default async function PublicHomePage() {
       <div
         style={{
           maxWidth: 1280,
-          margin: '0 auto',
-          padding: '22px 28px 0 28px',
-          display: 'flex',
+          margin: "0 auto",
+          padding: "22px 28px 0 28px",
+          display: "flex",
           gap: 28,
           // Stretch, not flex-start: with the featured band gone this row
           // holds just the browse rail and the recently-added cards, and the
           // two ended at different heights. Stretching lets the shorter
           // column fill the row so their bottoms line up.
-          alignItems: 'stretch',
-          flexWrap: 'wrap',
+          alignItems: "stretch",
+          flexWrap: "wrap",
         }}
       >
         {/* The menu's entries are derived here, on the server, from the
@@ -118,20 +114,24 @@ export default async function PublicHomePage() {
             category link is in the static HTML and works without JavaScript.
             Only the sub-items of an already-applied filter wait for
             hydration. Same boundary, same reasoning, as the directory below. */}
-        <Suspense fallback={<BrowseByNeed entries={needMenu} activeNeed={null} />}>
+        <Suspense
+          fallback={<BrowseByNeed entries={needMenu} activeNeed={null} />}
+        >
           <BrowseByNeedClient entries={needMenu} />
         </Suspense>
 
         <div
           style={{
-            flex: '1 1 300px',
-            display: 'flex',
-            flexDirection: 'column',
+            flex: "1 1 300px",
+            display: "flex",
+            flexDirection: "column",
             gap: 22,
             minInlineSize: 0,
           }}
         >
-          <RecentlyAddedRail resources={open} />
+          <Suspense fallback={<RecentlyAddedRail resources={open} />}>
+            <RecentlyAddedRailClient resources={open} />
+          </Suspense>
         </div>
       </div>
 

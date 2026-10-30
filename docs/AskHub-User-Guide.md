@@ -92,15 +92,15 @@ Every resource belongs to one main category, and sometimes a second one.
 
 ### Search in plain language
 
-1. Click the search box in the header (or the one above the directory).
+1. Scroll to **All resources** and click the search box.
 2. Type what you need in ordinary words, for example `funding for health AI in Kenya`.
 3. Press Enter or click **Search**.
-4. AskHub turns the words it recognises into filters — here, Funding, Health and Kenya — and searches the rest.
+4. AskHub turns the words it recognises into filters — here, Funding, Health and Kenya — and uses any other words to put the closest matches first. If nothing matches, it suggests what to change.
 
 ### Filter
 
 1. Scroll to **All resources**.
-2. Use the four dropdowns: **Categories**, **Sectors**, **Stages**, **Countries**.
+2. Use the dropdowns: **Categories**, **Subcategories** (once a category is chosen), **Sectors**, **Stages**, **Countries**.
 3. Your choices appear as chips above the results. Click a chip's × to remove it.
 
 [Screenshot: the directory with two filter chips applied]
@@ -108,7 +108,7 @@ Every resource belongs to one main category, and sometimes a second one.
 ### Sort
 
 1. Use **Sort by** at the right of the results header.
-2. Choose **Featured Resources** (the team's picks first) or **Recently added**.
+2. Choose **Featured Resources** (the team's picks first) or **Recently added**. After a search you can also choose **Best match**, which AskHub selects for you.
 
 ### Page through and share
 
@@ -140,8 +140,8 @@ Every resource belongs to one main category, and sometimes a second one.
 ### On the resource page
 
 - **Description** — what it offers and who it is for.
-- **Who can apply** — stages, sectors, countries or scope, and the deadline.
-- **Apply button** and **Share** (copy link, LinkedIn, email, WhatsApp).
+- **Details panel** — stages, sectors, countries or scope, and the deadline.
+- **Apply button** and **Share** (copy link, LinkedIn, email, WhatsApp). LinkedIn does not accept text from another site, so **Share on LinkedIn** copies the text for you: paste it into your post.
 - The line *Every resource is curated by the AI Hub team.*
 
 ### Deadline status

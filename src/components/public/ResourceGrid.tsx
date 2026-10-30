@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { t } from '@/lib/i18n';
 import ResourceCard from './ResourceCard';
 import type { PublicResource } from '@/lib/public/types';
@@ -45,15 +46,17 @@ export const DIRECTORY_HEADING = {
  *
  * The empty states take the prototype's dashed panel but not its "Clear all
  * filters" button: the removable chips and the Clear filters control already
- * sit directly above this, so a third route to the same action would be
- * noise.
+ * sit directly above this. The caller supplies specific next steps instead.
  */
 export default function ResourceGrid({
   resources,
   allCount,
+  emptyContent = null,
 }: {
   resources: readonly PublicResource[];
   allCount: number;
+  /** What to say when nothing matched, for a caller that knows why. */
+  emptyContent?: ReactNode;
 }) {
   // Three empty cases exist across the two callers, deliberately distinct.
   // Telling someone to remove a filter when they have not set one is worse
@@ -70,10 +73,9 @@ export default function ResourceGrid({
   if (resources.length === 0) {
     return (
       <div style={EMPTY_PANEL}>
-        <div style={{ fontSize: 16, fontWeight: 800 }}>{t('directory.emptyFiltered')}</div>
-        <div style={{ fontSize: 13.5, color: '#5B6B8C', marginTop: 6 }}>
-          {t('directory.emptyFilteredAction')}
-        </div>
+        {emptyContent ?? (
+          <div style={{ fontSize: 16, fontWeight: 800 }}>{t('directory.emptyFiltered')}</div>
+        )}
       </div>
     );
   }

@@ -41,6 +41,8 @@ export interface NeedMenuEntry {
   liveCount: number;
   /** Distinct `sub_category` values on this need's live resources, capped. */
   subCategories: NeedMenuSubCategory[];
+  /** The rest of them, past the cap. Listed only once one is selected. */
+  moreSubCategories: NeedMenuSubCategory[];
 }
 
 /**
@@ -108,11 +110,28 @@ export function buildNeedMenu(
   // silently missing is harder to explain than an honest zero. A need absent
   // from `counts` is absent because Postgres counts live rows and found none,
   // which is the same thing as zero.
-  return BROWSE_ORDER.map((need) => ({
-    need,
-    liveCount: byNeed.get(need)?.liveCount ?? 0,
-    subCategories: subCategoriesFor(resources, need),
-  }));
+  return BROWSE_ORDER.map((need) => {
+    const subCategories = subCategoriesFor(resources, need);
+    return {
+      need,
+      liveCount: byNeed.get(need)?.liveCount ?? 0,
+      subCategories: subCategories.slice(0, MAX_SUB_CATEGORIES),
+      moreSubCategories: subCategories.slice(MAX_SUB_CATEGORIES),
+    };
+  });
+}
+
+/**
+ * The sub-items the rail lists: the capped ones, plus the selected one if the
+ * directory's dropdown picked it from past the cap. Otherwise the rail would
+ * show no selection at all while the directory was filtered by one.
+ */
+export function railSubCategories(
+  entry: NeedMenuEntry,
+  selected: string | null,
+): NeedMenuSubCategory[] {
+  const beyondCap = entry.moreSubCategories.find((sub) => sub.label === selected);
+  return beyondCap ? [...entry.subCategories, beyondCap] : entry.subCategories;
 }
 
 /**
@@ -128,12 +147,13 @@ export function buildNeedMenu(
  * mean choosing which of a curator's two spellings to show. The order is
  * first appearance in `resources`, which is the order the readers return.
  *
- * **The cap is applied after counting, not during it.** Every matching row is
- * tallied first and only then are the first MAX_SUB_CATEGORIES labels kept,
- * so a label's count is the whole truth about that label rather than however
- * many of its rows happened to appear before the cap was reached. Counting as
- * it went would have made the numbers depend on row order -- the one thing a
- * count must not do.
+ * **This list is uncapped; `buildNeedMenu` applies the cap after it.** Every
+ * matching row is tallied first, so a label's count is the whole truth about
+ * that label rather than however many of its rows happened to appear before
+ * the cap was reached. Counting as it went would have made the numbers depend
+ * on row order -- the one thing a count must not do. The directory's dropdown
+ * reads the same list in full, so the rail's sub-items are always its first
+ * options, in the same order.
  *
  * The prototype shows no number beside a sub-item; these
  * are added at the client's instruction. Nothing about them is estimated or
@@ -141,7 +161,7 @@ export function buildNeedMenu(
  * holds, so a sub-item with nothing behind it cannot exist to be
  * mislabelled.
  */
-function subCategoriesFor(
+export function subCategoriesFor(
   resources: readonly PublicResource[],
   need: NeedKey,
 ): NeedMenuSubCategory[] {
@@ -152,7 +172,5 @@ function subCategoriesFor(
     if (!label) continue;
     tally.set(label, (tally.get(label) ?? 0) + 1);
   }
-  return [...tally]
-    .slice(0, MAX_SUB_CATEGORIES)
-    .map(([label, liveCount]) => ({ label, liveCount }));
+  return [...tally].map(([label, liveCount]) => ({ label, liveCount }));
 }

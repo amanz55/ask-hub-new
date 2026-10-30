@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { submitResourceSuggestion } from '@/lib/actions/suggestions';
 import {
   suggestionInput,
@@ -8,6 +8,7 @@ import {
   type SuggestionField,
 } from '@/lib/schemas/suggestion';
 import { COUNTRIES, SECTORS, NEED_KEYS } from '@/lib/reference';
+import { CONTACT_TILE_BUTTON } from './contact-tile-button';
 import { t } from '@/lib/i18n';
 
 const LABEL = {
@@ -133,6 +134,12 @@ export default function SuggestResourceModal() {
   const [outcome, setOutcome] = useState<'idle' | 'sent' | 'rateLimited' | 'failed'>('idle');
   const [pending, startTransition] = useTransition();
 
+  // `/contact#suggest` opens the form straight away, for the directory's "can't
+  // find what you need" link. The state is already blank on arrival.
+  useEffect(() => {
+    if (window.location.hash === '#suggest') dialogRef.current?.showModal();
+  }, []);
+
   function set<K extends keyof Values>(key: K, value: Values[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
@@ -188,18 +195,7 @@ export default function SuggestResourceModal() {
         type="button"
         onClick={open}
         className="proto-primary-button"
-        style={{
-          display: 'inline-block',
-          marginTop: 18,
-          background: '#1F5FBF',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 9,
-          padding: '12px 24px',
-          fontSize: 14,
-          fontWeight: 700,
-          cursor: 'pointer',
-        }}
+        style={CONTACT_TILE_BUTTON}
       >
         {t('contact.suggestAction')}
       </button>

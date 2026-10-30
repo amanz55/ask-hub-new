@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { t } from '@/lib/i18n';
 
 /**
@@ -9,6 +9,16 @@ import { t } from '@/lib/i18n';
  * written here, so it is policed by the content-rule scan like every other
  * user-facing string and can be translated later.
  */
+/**
+ * A phone's own share sheet, which is what can reach an installed LinkedIn app:
+ * LinkedIn's web share link stays in the browser. Touch devices only, because
+ * desktop browsers that have this API offer a sheet with no LinkedIn in it.
+ * Absent on plain http, where the web link below still works.
+ */
+function canUseShareSheet(): boolean {
+  return typeof navigator.share === 'function' && window.matchMedia('(pointer: coarse)').matches;
+}
+
 export default function ShareModal({ url, title }: { url: string; title: string }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState(t('share.defaultText'));
@@ -16,6 +26,7 @@ export default function ShareModal({ url, title }: { url: string; title: string 
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
 
   const body = `${message}\n\n${title}\n${url}`;
+  const linkedInHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
 
   /**
    * Copying can fail in two ways that both used to be invisible.
@@ -39,6 +50,43 @@ export default function ShareModal({ url, title }: { url: string; title: string 
     } catch {
       setCopyState('failed');
     }
+  }
+
+  /**
+   * LinkedIn's share link takes a URL and nothing else, so the text travels by
+   * clipboard for the visitor to paste into their post. The panel says so up
+   * front, because a message shown after the click would be behind the new tab.
+   *
+   * The copy finishes before the tab opens, because a page that has lost focus
+   * can be refused the clipboard. A failed copy still opens LinkedIn: the
+   * fallback text is waiting on this page when the visitor comes back.
+   */
+  async function shareToLinkedIn(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    if (canUseShareSheet()) {
+      // Not awaited: the sheet must open within the tap, and it takes focus, so
+      // a refusal here says nothing worth showing a visitor who has just shared.
+      void navigator.clipboard?.writeText(body).then(
+        () => setCopyState('copied'),
+        () => undefined,
+      );
+      try {
+        await navigator.share({ title, text: message, url });
+        return;
+      } catch (error) {
+        // Dismissing the sheet is a choice, not a failure. Anything else falls
+        // back to the web link.
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      }
+    } else {
+      await copy();
+    }
+    // Without `noopener`, which would make a blocked tab undetectable: opening
+    // after an await is what a popup blocker may refuse, and then the visitor
+    // is sent to LinkedIn in this tab rather than left with nothing happening.
+    const tab = window.open(linkedInHref, '_blank');
+    if (tab) tab.opener = null;
+    else window.location.assign(linkedInHref);
   }
 
   // Selecting happens here rather than in the catch because the textarea does
@@ -114,7 +162,8 @@ export default function ShareModal({ url, title }: { url: string; title: string 
           className="text-primary underline"
           target="_blank"
           rel="noopener noreferrer"
-          href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`}
+          href={linkedInHref}
+          onClick={(event) => void shareToLinkedIn(event)}
         >
           {t('share.linkedin')}
         </a>
@@ -136,6 +185,7 @@ export default function ShareModal({ url, title }: { url: string; title: string 
           {t('share.close')}
         </button>
       </div>
+      <p className="mt-3 text-sm text-muted">{t('share.linkedinPaste')}</p>
       {copyState === 'failed' ? (
         <div className="mt-3 text-sm text-muted">
           <p className="text-danger">{t('share.copyFailed')}</p>

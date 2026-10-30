@@ -272,24 +272,12 @@ export default async function ResourceDetailPage({
           padding: '26px 28px',
         }}
       >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 13,
-            fontWeight: 800,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            color: '#2E9BD6',
-          }}
-        >
-          {t('detail.eligibility')}
-        </h2>
         <dl
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
             gap: 24,
-            marginTop: 16,
+            margin: 0,
           }}
         >
           <Row term={t('detail.stages')} value={

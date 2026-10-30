@@ -36,5 +36,11 @@ export default function BrowseByNeedClient({
   entries: NeedMenuEntry[];
 }) {
   const criteria = parseFilters(useSearchParams());
-  return <BrowseByNeed entries={entries} activeNeed={criteria.need} />;
+  return (
+    <BrowseByNeed
+      entries={entries}
+      activeNeed={criteria.need}
+      activeSubCategory={criteria.subCategory}
+    />
+  );
 }

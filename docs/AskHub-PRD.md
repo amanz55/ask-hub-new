@@ -125,7 +125,7 @@ Personas are roles, not individuals.
 
 ### 6.1 In scope (current release)
 
-- Public directory: home page with browse-by-category menu, recently added rail and the full directory; search with plain-language parsing; filters by category, sector, stage and country; two sort orders; pagination; CSV and Excel export of the filtered list.
+- Public directory: home page with browse-by-category menu, recently added rail and the full directory; search with plain-language parsing; filters by category, sub-category, sector, stage and country; sort orders; pagination; CSV and Excel export of the filtered list.
 - Resource detail page with eligibility panel, deadline status, apply link, share options and structured data for search engines.
 - Public "Suggest a resource" form, rate-limited, feeding the review queue.
 - Contact page with the single AI Hub mailbox.
@@ -161,19 +161,19 @@ Personas are roles, not individuals.
 1. Arrives at the home page (from a link, a search engine once indexing is enabled, or the AI Hub site).
 2. Reads the welcome band and, if present, the headline reach strip.
 3. Either scans the **Browse** menu on the left (seven categories, each with its live count, expandable to sub-categories) or the **Recently added** rail.
-4. Scrolls to **All resources**, or types into the search pill in the header.
+4. Scrolls to **All resources** and types into its search box.
 
 ### 7.2 Visitor: filter and search
 
 1. Types a plain-language query such as "funding for health AI in Kenya".
-2. The directory turns recognisable words into filters (Funding; Health; Kenya) and searches the remaining words across name, provider, description and sub-category.
-3. Refines with the four dropdowns (Categories, Sectors, Stages, Countries) and the sort control (Featured Resources, Recently added).
+2. The directory turns recognisable words into filters (Funding; Health; Kenya) and uses the remaining words, found in name, provider, description or sub-category, to put the closest matches first.
+3. Refines with the dropdowns (Categories, Subcategories, Sectors, Stages, Countries) and the sort control (Best match while searching, Featured Resources, Recently added).
 4. Active filters appear as removable chips. The URL carries every filter, so the view can be bookmarked or shared.
 5. Pages through results, twelve per page.
 
 ### 7.3 Visitor: open a resource
 
-1. Opens a card. The detail page shows the provider, the description, a "Who can apply" panel (stages, sectors, countries, deadline), and the deadline status.
+1. Opens a card. The detail page shows the provider, the description, a panel of stages, sectors, countries and deadline, and the deadline status.
 2. If the resource is open, an apply button leads to the provider's own site in a new tab. If it is closed, the apply button is absent and a Closed marker is shown.
 3. Shares the page by link, LinkedIn, email or WhatsApp.
 
@@ -241,7 +241,7 @@ Each requirement is numbered, testable, and true of the current release. Require
 | FR-001 | The home page shall render, without JavaScript, the welcome band, the browse-by-category menu, the recently added rail and the full directory of live, open resources. |
 | FR-002 | The browse menu shall list all seven categories in a fixed order, each with its count of live, open resources, including categories whose count is zero. |
 | FR-003 | Expanding a category in the browse menu shall show up to four of its sub-categories and a "More" link to the category's full list. |
-| FR-004 | The recently added rail shall show the six most recently added live, open resources. |
+| FR-004 | The recently added rail shall show the six most recently added live, open resources. With a category or sub-category selected, it shall show that selection's six newest under a title naming it ("Courses", "Courses – Cloud credits"), and say so if there are none. |
 | FR-005 | Each directory card shall show the provider, the title, the primary category, any secondary category, sector and geographic tags, the deadline status, a description clamped to three lines, a View details link to the detail page and (when open) an apply link to the provider's application page. |
 | FR-006 | Featured resources shall sort first under the default sort; ties shall break by curator sort order, then by identifier, so the order is stable between renders. |
 | FR-007 | The directory shall paginate at twelve resources per page; a page number beyond the last shall show the first page. |
@@ -253,21 +253,21 @@ Each requirement is numbered, testable, and true of the current release. Require
 
 | ID | Requirement |
 |---|---|
-| FR-020 | The header search and the directory search shall accept free text and turn recognised category, sector, stage and country words into the corresponding filters, searching the remaining words. |
-| FR-021 | A free-text query shall match a resource when every remaining word appears somewhere in its name, provider, description or sub-category. |
-| FR-022 | Filters shall be selectable by category, sector, stage and country; an empty sector or country list on a resource shall mean "open to all" and match every selection. |
+| FR-020 | The directory search shall accept free text and turn recognised category, sector, stage and country words into the corresponding filters, searching the remaining words. |
+| FR-021 | The remaining words shall rank results by where they appear in name, sub-category, provider and description. They shall exclude resources only when no category, sub-category, sector, stage or country is set, and then a resource shall match if it contains at least one of them. An empty result shall retain the query and offer specific next steps with their result counts. |
+| FR-022 | Filters shall be selectable by category, sub-category (within the selected category), sector, stage and country; an empty sector or country list on a resource shall mean "open to all" and match every selection. |
 | FR-023 | A resource whose geographic scope is Global, All Africa or AI Hub programme countries shall match every country selection; only a resource scoped to Selected countries shall be narrowed by its country list. |
 | FR-024 | The country filter shall offer exactly the 18 programme countries and no catch-all option. |
 | FR-025 | Every active filter, the query, the sort and the page shall be represented in the URL, so a filtered view is shareable; unrecognised URL values shall fall back to defaults rather than producing an empty result. |
 | FR-026 | Changing any filter shall return the visitor to page one; changing only the page shall not reset filters. |
-| FR-027 | Two sort orders shall be offered: Featured Resources (default) and Recently added. |
+| FR-027 | Two sort orders shall be offered: Featured Resources (default) and Recently added. Best match shall also be offered while there are search words or a sector to rank on, and a search shall select it unless the visitor has chosen another order. |
 
 ### 8.3 Resource detail
 
 | ID | Requirement |
 |---|---|
 | FR-040 | Every resource with status Live shall have a public page at a stable address, including after its deadline has passed. |
-| FR-041 | The detail page shall show the provider (linked to its website when one is recorded), title, description, the "Who can apply" panel (stages, sectors, countries or scope, deadline), and the deadline status in one of: Rolling, N days left, Closes today, Closed. |
+| FR-041 | The detail page shall show the provider (linked to its website when one is recorded), title, description, a panel of stages, sectors, countries or scope, and deadline, and the deadline status in one of: Rolling, N days left, Closes today, Closed. |
 | FR-042 | The apply link shall be shown only while the resource is open; a closed resource shall show a Closed marker instead. |
 | FR-043 | The page shall offer sharing by copied link, LinkedIn, email and WhatsApp, with editable pre-written text. |
 | FR-044 | The page shall embed schema.org Offer structured data derived from the resource, omitting any property whose value is absent. |
@@ -455,13 +455,13 @@ Hosting is on managed platforms with no single server to maintain. No availabili
 | Page | Path | Components |
 |---|---|---|
 | Home | `/` | Welcome band, headline strip (hidden when empty), Browse-by-category menu, Recently added rail, All resources directory with search, filter chips, dropdowns, sort, grid, pagination, export |
-| Resource detail | `/resources/{id}` | Hero band, badges, title, provider, description, apply and share actions, Who can apply panel, curation statement |
-| Contact | `/contact` | Mailbox, Suggest a resource panel and modal form |
+| Resource detail | `/resources/{id}` | Hero band, badges, title, provider, description, apply and share actions, eligibility details panel, curation statement |
+| Contact | `/contact` | Get in touch panel with a pre-addressed email button, Suggest a resource panel and modal form |
 | Privacy, Terms | `/privacy`, `/terms` | Editable copy |
 | About | `/about` | Redirects to the AI Hub website |
 | Admin | `/admin/…` | Dashboard, Reach & Engagement (placeholder), Resources, Review Queue, Settings, Audit Log; sign-in, forgot password, set password |
 
-UX principles: one search above the fold (the header pill), not two; the URL is the single source of filter state; every band hides itself rather than showing an empty frame; forms save on leaving a field where the prototype has no save button; a viewer sees no write control at all rather than a greyed one; visual values follow the approved prototype except where accessibility requires otherwise.
+UX principles: one search box, in the directory; the URL is the single source of filter state; every band hides itself rather than showing an empty frame; forms save on leaving a field where the prototype has no save button; a viewer sees no write control at all rather than a greyed one; visual values follow the approved prototype except where accessibility requires otherwise.
 
 ## 12. Analytics and measurement plan
 

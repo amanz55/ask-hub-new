@@ -114,3 +114,106 @@ describe('ShareModal copy', () => {
     expect(screen.queryByText(t('share.copyFailed'))).toBeNull();
   });
 });
+
+describe('ShareModal LinkedIn', () => {
+  const body = `${t('share.defaultText')}\n\n${TITLE}\n${URL_UNDER_TEST}`;
+
+  function linkedInWith({ share, coarse }: { share?: unknown; coarse: boolean }) {
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    window.matchMedia = vi.fn().mockReturnValue({ matches: coarse });
+    openPanel();
+    return screen.getByRole('link', { name: t('share.linkedin') });
+  }
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+  });
+
+  it('explains the paste step before anything is clicked', () => {
+    linkedInWith({ coarse: false });
+    expect(screen.getByText(t('share.linkedinPaste'))).toBeTruthy();
+  });
+
+  it('copies the whole text, and only then opens LinkedIn', async () => {
+    const order: string[] = [];
+    withClipboard({
+      writeText: vi.fn(async () => {
+        order.push('copied');
+      }),
+    });
+    const open = vi.spyOn(window, 'open').mockImplementation(() => {
+      order.push('opened');
+      return {} as Window;
+    });
+    const link = linkedInWith({ coarse: false });
+
+    expect(fireEvent.click(link)).toBe(false);
+
+    await waitFor(() => expect(order).toEqual(['copied', 'opened']));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(body);
+    expect(open).toHaveBeenCalledWith(link.getAttribute('href'), '_blank');
+  });
+
+  it('copies what the visitor edited, not the default', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    withClipboard({ writeText });
+    vi.spyOn(window, 'open').mockReturnValue({} as Window);
+    const link = linkedInWith({ coarse: false });
+
+    fireEvent.change(screen.getByLabelText(t('share.message')), { target: { value: 'My words' } });
+    fireEvent.click(link);
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(`My words\n\n${TITLE}\n${URL_UNDER_TEST}`),
+    );
+  });
+
+  it('still opens LinkedIn when the copy fails, leaving the text to copy by hand', async () => {
+    withClipboard({ writeText: vi.fn().mockRejectedValue(new Error('denied')) });
+    const open = vi.spyOn(window, 'open').mockReturnValue({} as Window);
+
+    fireEvent.click(linkedInWith({ coarse: false }));
+
+    await waitFor(() => expect(open).toHaveBeenCalled());
+    expect(screen.getByText(t('share.copyFailed'))).toBeTruthy();
+  });
+
+  it('copies as well as opening the share sheet on a touch device', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    withClipboard({ writeText });
+    const open = vi.spyOn(window, 'open');
+    const share = vi.fn().mockResolvedValue(undefined);
+
+    fireEvent.click(linkedInWith({ share, coarse: true }));
+
+    expect(writeText).toHaveBeenCalledWith(body);
+    expect(share).toHaveBeenCalledWith({
+      title: TITLE,
+      text: t('share.defaultText'),
+      url: URL_UNDER_TEST,
+    });
+    await screen.findByText(t('share.copied'));
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('does nothing more when the visitor dismisses the sheet', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const share = vi.fn().mockRejectedValue(new DOMException('dismissed', 'AbortError'));
+
+    fireEvent.click(linkedInWith({ share, coarse: true }));
+
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the web link when the sheet fails', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue({} as Window);
+    const share = vi.fn().mockRejectedValue(new DOMException('refused', 'NotAllowedError'));
+    const link = linkedInWith({ share, coarse: true });
+
+    fireEvent.click(link);
+
+    await waitFor(() => expect(open).toHaveBeenCalledWith(link.getAttribute('href'), '_blank'));
+  });
+});

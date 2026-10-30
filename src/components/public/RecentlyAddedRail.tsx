@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { t } from '@/lib/i18n';
-import { sortResources } from '@/lib/public/filters';
+import { EMPTY_CRITERIA, filterResources, sortResources } from '@/lib/public/filters';
 import { deadlineLabel } from '@/lib/public/deadline-label';
 import { needBanner, bannerPartner } from '@/lib/public/need-banner';
-import type { PublicResource } from '@/lib/public/types';
+import type { NeedKey, PublicResource } from '@/lib/public/types';
 
 const RECENT_LIMIT = 6;
 
@@ -30,10 +30,28 @@ const RECENT_LIMIT = 6;
  * the deadline label the card already derives -- "Rolling", "Closed", "12
  * days left" -- which occupies the same position, needs no new date handling,
  * and tells a visitor something more actionable than an arrival date.
+ *
+ * **It follows the browse selection, at the client's request.** With a category
+ * or sub-category selected it shows that selection's newest resources under a
+ * title naming it. Only those two narrow it: the directory's other filters and
+ * search words belong to the directory.
  */
-export default function RecentlyAddedRail({ resources }: { resources: PublicResource[] }) {
-  const recent = sortResources(resources, 'recent').slice(0, RECENT_LIMIT);
-  if (recent.length === 0) return null;
+export default function RecentlyAddedRail({
+  resources,
+  need = null,
+  subCategory = null,
+}: {
+  resources: PublicResource[];
+  need?: NeedKey | null;
+  subCategory?: string | null;
+}) {
+  const recent = sortResources(
+    filterResources(resources, { ...EMPTY_CRITERIA, need, subCategory }),
+    'recent',
+  ).slice(0, RECENT_LIMIT);
+  // With a category selected the title stays and says why the rail is empty, as
+  // the visitor has just asked for it. Otherwise there is nothing to show at all.
+  if (recent.length === 0 && need === null) return null;
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -46,10 +64,33 @@ export default function RecentlyAddedRail({ resources }: { resources: PublicReso
           color: '#1A2332',
         }}
       >
-        {t('home.recentHeading')}
+        {heading(need, subCategory)}
       </h2>
 
+      {recent.length === 0 ? (
+        <p
+          style={{
+            margin: '14px 0 0 0',
+            padding: 28,
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px dashed #C9D3E8',
+            borderRadius: 14,
+            fontSize: 13.5,
+            color: '#5B6B8C',
+          }}
+        >
+          {t('home.railEmpty')}
+        </p>
+      ) : null}
+
       <ul
+        // Remounts on a new selection, so the rail starts again from its first
+        // card rather than keeping the scroll position of the previous list.
+        key={`${need}/${subCategory}`}
+        hidden={recent.length === 0}
         className="proto-rail-scroller"
         style={{
           display: 'flex',
@@ -198,6 +239,12 @@ export default function RecentlyAddedRail({ resources }: { resources: PublicReso
       </ul>
     </section>
   );
+}
+
+function heading(need: NeedKey | null, subCategory: string | null): string {
+  if (need === null) return t('home.recentHeading');
+  if (subCategory === null) return t(`need.${need}`);
+  return t('home.railHeadingSub', { need: t(`need.${need}`), sub: subCategory });
 }
 
 const RAIL_BADGE = {

@@ -163,9 +163,7 @@ body {
 
 /*
  * Transcribed from the approved prototype's own global stylesheet
- * (the approved prototype). `fadeUp` is its entrance animation, and
- * `.askhub-wordmark` hides the header wordmark on narrow screens so the logo
- * and search pill still fit on one row.
+ * (the approved prototype). `fadeUp` is its entrance animation.
  *
  * The prototype's `marquee` keyframes went with the partner carousel this
  * release removes; nothing else animated on translation.
@@ -207,12 +205,6 @@ button {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .askhub-wordmark {
-    display: none;
   }
 }
 

@@ -9,10 +9,15 @@ import {
   sortResources,
   EMPTY_CRITERIA,
   DEFAULT_SORT,
+  dropUnknownSubCategory,
+  arrangeResources,
+  recoveryOptions,
+  rankTerms,
   paginate,
   resetPageOnFilterChange,
   type FilterCriteria,
 } from '@/lib/public/filters';
+import { buildNeedMenu } from '@/lib/public/need-menu';
 import type { PublicResource } from '@/lib/public/types';
 
 function resource(overrides: Partial<PublicResource> = {}): PublicResource {
@@ -59,11 +64,12 @@ describe('parseFilters', () => {
   it('reads every facet', () => {
     const parsed = parseFilters(
       new URLSearchParams(
-        'need=funding&sector=Health&country=Kenya&stage=Building&q=grants&sort=recent',
+        'need=funding&sub=Grants&sector=Health&country=Kenya&stage=Building&q=grants&sort=recent',
       ),
     );
     expect(parsed).toEqual({
       need: 'funding',
+      subCategory: 'Grants',
       sector: 'Health',
       country: 'Kenya',
       stage: 'Building',
@@ -83,8 +89,57 @@ describe('parseFilters', () => {
     expect(parsed.sort).toBe(DEFAULT_SORT);
   });
 
+  it('ignores a sub-category with no need to refine', () => {
+    expect(parseFilters(new URLSearchParams('sub=Grants')).subCategory).toBeNull();
+    expect(parseFilters(new URLSearchParams('need=nonsense&sub=Grants')).subCategory).toBeNull();
+  });
+
+  it('reads a blank sub-category as none', () => {
+    expect(parseFilters(new URLSearchParams('need=funding&sub=%20%20')).subCategory).toBeNull();
+  });
+
   it('trims the free-text query', () => {
     expect(parseFilters(new URLSearchParams('q=%20%20grants%20%20')).query).toBe('grants');
+  });
+});
+
+describe('dropUnknownSubCategory', () => {
+  const selected = criteria({ need: 'funding', subCategory: 'Grants', country: 'Kenya' });
+
+  it('keeps a sub-category the need offers', () => {
+    expect(dropUnknownSubCategory(selected, ['Grants', 'Loans'])).toEqual(selected);
+  });
+
+  it('drops a stale one, and only that, rather than opening an empty directory', () => {
+    expect(dropUnknownSubCategory(selected, ['Loans'])).toEqual({ ...selected, subCategory: null });
+  });
+});
+
+describe('filterResources by sub-category', () => {
+  const rows = [
+    resource({ id: 'exact', needPrimary: 'training', subCategory: 'Curriculum' }),
+    resource({ id: 'spaced', needPrimary: 'training', subCategory: '  Curriculum ' }),
+    resource({ id: 'secondary', needPrimary: 'funding', needSecondary: 'training', subCategory: 'Curriculum' }),
+    resource({
+      id: 'mentions',
+      needPrimary: 'training',
+      subCategory: 'Other',
+      description: 'Includes a Curriculum.',
+    }),
+    resource({ id: 'none', needPrimary: 'training', subCategory: null }),
+    resource({ id: 'other-need', needPrimary: 'compute', subCategory: 'Curriculum' }),
+  ];
+
+  it('matches the field, not text that merely mentions it, within the need', () => {
+    const found = filterResources(rows, criteria({ need: 'training', subCategory: 'Curriculum' }));
+    expect(found.map((r) => r.id)).toEqual(['exact', 'spaced', 'secondary']);
+  });
+
+  it('agrees with the count the browse menu shows', () => {
+    const [entry] = buildNeedMenu([{ need: 'training', liveCount: 5 }], rows);
+    const listed = entry!.subCategories.find((sub) => sub.label === 'Curriculum');
+    const found = filterResources(rows, criteria({ need: 'training', subCategory: 'Curriculum' }));
+    expect(listed?.liveCount).toBe(found.length);
   });
 });
 
@@ -102,7 +157,14 @@ describe('directoryHref', () => {
     expect(directoryHref(criteria({ need: 'compute' }))).toBe('/?need=compute#directory');
   });
 
-  it('serialises a need and a sub-category search as the pair the chips use', () => {
+  it('serialises a need and sub-category, and leaves the key out when cleared', () => {
+    expect(directoryHref(criteria({ need: 'training', subCategory: 'Cloud credits' }))).toBe(
+      '/?need=training&sub=Cloud+credits#directory',
+    );
+    expect(directoryHref(criteria({ need: 'training' }))).toBe('/?need=training#directory');
+  });
+
+  it('serialises a need and a text search as the pair the chips use', () => {
     // This exact string is what a browse-menu sub-item links to, and it must
     // parse back to the same selection a visitor could have reached by
     // choosing the need chip and typing the phrase into the search box.
@@ -266,11 +328,9 @@ describe('filterResources', () => {
     expect(filterResources(rows, criteria({ query: 'CLOUD' })).map((r) => r.id)).toEqual(['a']);
   });
 
-  it('requires every word, and lets them fall in different fields', () => {
-    // The text term reaching this point is the leftover of `parseQuery` -- a
-    // bag of words it could not turn into a facet -- so matching is per word,
-    // not a phrase lookup. 'Google' is the partner and 'grant' the name, and
-    // no single field holds both.
+  it('lets the words of a search fall in different fields', () => {
+    // 'Google' is the partner and 'grant' the name, and no single field holds
+    // both.
     expect(filterResources(rows, criteria({ query: 'google grant' })).map((r) => r.id)).toEqual([
       'b',
     ]);
@@ -279,10 +339,16 @@ describe('filterResources', () => {
     ]);
   });
 
-  it('does not match when only some of the words are there', () => {
-    // 'indaba' is row c's partner and 'grant' is row b's name; neither row
-    // carries both, so an OR would wrongly return two rows here.
-    expect(filterResources(rows, criteria({ query: 'indaba grant' }))).toEqual([]);
+  it('needs only one of the words when no facet is set', () => {
+    // 'indaba' is row c's partner and 'grant' is row b's name.
+    const found = filterResources(rows, criteria({ query: 'indaba grant' })).map((r) => r.id);
+    expect(found.sort()).toEqual(['b', 'c']);
+  });
+
+  it('never excludes on search words once a facet is set', () => {
+    // The client's report: "career" emptied a category holding real answers.
+    const found = filterResources(rows, criteria({ need: 'training', query: 'career' }));
+    expect(found.map((r) => r.id)).toEqual(['c']);
   });
 
   it('ignores the order the words are typed in', () => {
@@ -395,6 +461,7 @@ describe('pagination', () => {
   it('resets to the first page when any filter changes', () => {
     const onPageFive: FilterCriteria = { ...EMPTY_CRITERIA, page: 5 };
     expect(resetPageOnFilterChange({ ...onPageFive, need: 'compute' }, onPageFive).page).toBe(1);
+    expect(resetPageOnFilterChange({ ...onPageFive, subCategory: 'Grants' }, onPageFive).page).toBe(1);
     expect(resetPageOnFilterChange({ ...onPageFive, query: 'gpu' }, onPageFive).page).toBe(1);
     expect(resetPageOnFilterChange({ ...onPageFive, sort: 'recent' }, onPageFive).page).toBe(1);
   });
@@ -451,5 +518,104 @@ describe('browseHref', () => {
     expect(browseHref({ ...EMPTY_CRITERIA, need: 'funding' }, base)).toContain(
       'utm_source=newsletter',
     );
+  });
+});
+
+describe('arrangeResources', () => {
+  const rows = [
+    resource({ id: 'plain', name: 'Starter', partnerName: 'P', description: 'Nothing here.', subCategory: null, isFeatured: true }),
+    resource({ id: 'desc', name: 'Programme', partnerName: 'P', description: 'Grow your career.', subCategory: null }),
+    resource({ id: 'name', name: 'Career paths', partnerName: 'P', description: 'Nothing here.', subCategory: null }),
+  ];
+  const best = (over: Partial<FilterCriteria>) =>
+    arrangeResources(rows, criteria({ need: 'compute', sort: 'best', ...over })).map((r) => r.id);
+
+  it('puts the most words first, then the strongest field', () => {
+    expect(best({ query: 'grow career' })).toEqual(['desc', 'name', 'plain']);
+    expect(best({ query: 'career' })).toEqual(['name', 'desc', 'plain']);
+  });
+
+  it('ranks on the selected sector, since resources are rarely tagged with one', () => {
+    expect(rankTerms({ query: '', sector: 'Education & Training' })).toEqual(['education', 'training']);
+    const water = [...rows, resource({ id: 'water', name: 'Water fund', partnerName: 'P', description: 'x', subCategory: null })];
+    expect(
+      arrangeResources(water, criteria({ sector: 'Water', sort: 'best' }))[0]!.id,
+    ).toBe('water');
+  });
+
+  describe('when the search words do not decide the order', () => {
+    const tied = [
+      resource({ id: 'secondary', needPrimary: 'compute', needSecondary: 'training', isFeatured: true, name: 'A', partnerName: 'P', description: 'x', subCategory: null }),
+      resource({ id: 'main', needPrimary: 'training', name: 'B', partnerName: 'P', description: 'x', subCategory: null }),
+    ];
+
+    it('puts the main category above a secondary one, even if featured', () => {
+      const order = arrangeResources(tied, criteria({ need: 'training', query: 'grow', sort: 'best' }));
+      expect(order.map((r) => r.id)).toEqual(['main', 'secondary']);
+    });
+
+    it('still lets a word match outrank the category', () => {
+      const named = [{ ...tied[0]!, name: 'Grow fast' }, tied[1]!];
+      const order = arrangeResources(named, criteria({ need: 'training', query: 'grow', sort: 'best' }));
+      expect(order.map((r) => r.id)).toEqual(['secondary', 'main']);
+    });
+
+    it('keeps Featured first when no search is active', () => {
+      const order = arrangeResources(tied, criteria({ need: 'training' }));
+      expect(order.map((r) => r.id)).toEqual(['secondary', 'main']);
+    });
+  });
+
+  it('leaves the chosen order alone under any other sort', () => {
+    const featured = arrangeResources(rows, criteria({ query: 'career' }));
+    expect(featured[0]!.id).toBe('plain');
+  });
+});
+
+describe('Best match in the URL', () => {
+  it('is dropped once the words it ranks on are gone', () => {
+    expect(parseFilters(new URLSearchParams('sort=best')).sort).toBe(DEFAULT_SORT);
+    expect(parseFilters(new URLSearchParams('sort=best&q=career')).sort).toBe('best');
+    expect(directoryHref(criteria({ need: 'compute', sort: 'best' }))).toBe('/?need=compute#directory');
+  });
+});
+
+describe('recoveryOptions', () => {
+  const rows = [
+    resource({ id: 'a', needPrimary: 'funding', geoScope: 'specific', countriesEligible: ['Ghana'], stagesEligible: ['Building'] }),
+    resource({ id: 'b', needPrimary: 'compute', geoScope: 'specific', countriesEligible: ['Kenya'], stagesEligible: ['Scaling'] }),
+  ];
+
+  it('offers each facet to remove, with the count it leads to, and no dead ends', () => {
+    const options = recoveryOptions(rows, criteria({ need: 'funding', country: 'Kenya', stage: 'Scaling' }));
+    const removes = options.flatMap((o) => (o.kind === 'remove' ? [[o.facet, o.count]] : []));
+    // Removing the stage or country alone still leaves an empty combination.
+    expect(removes).toEqual([['need', 1]]);
+    expect(options[0]!.criteria).toMatchObject({ need: null, country: 'Kenya', stage: 'Scaling', page: 1 });
+  });
+
+  it('offers clearing everything when several constraints are active', () => {
+    const options = recoveryOptions(rows, criteria({ need: 'funding', country: 'Kenya', stage: 'Scaling' }));
+    const last = options[options.length - 1];
+    expect(last).toMatchObject({ kind: 'clearAll', count: 2 });
+    expect(last!.criteria).toEqual(EMPTY_CRITERIA);
+  });
+
+  it('has no separate clear-all for a single constraint', () => {
+    const options = recoveryOptions(rows, criteria({ query: 'xyzzy' }));
+    expect(options.some((o) => o.kind === 'clearAll')).toBe(false);
+  });
+
+  it('clears the sub-category along with its need', () => {
+    const options = recoveryOptions(rows, criteria({ need: 'data', subCategory: 'Maps' }));
+    const need = options.find((o) => o.kind === 'remove' && o.facet === 'need');
+    expect(need?.criteria.subCategory).toBeNull();
+  });
+
+  it('offers clearing the search and the biggest categories for a search alone', () => {
+    const options = recoveryOptions(rows, criteria({ query: 'xyzzy' }));
+    expect(options[0]).toMatchObject({ kind: 'remove', facet: 'query', count: 2 });
+    const browse = options.filter((o) => o.kind === 'browse').map((o) => o.kind === 'browse' && o.need);
+    expect(browse.sort()).toEqual(['compute', 'funding']);
   });
 });

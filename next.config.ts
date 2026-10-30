@@ -2,6 +2,14 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /**
+   * Development only: lets a phone on the same network open the dev server.
+   * Next blocks its dev scripts for any host but localhost, and the symptom is
+   * easy to misread: the page renders, but no button or filter responds.
+   * The range rather than one address, because a router can reassign it.
+   */
+  allowedDevOrigins: ['192.168.*.*'],
+
+  /**
    * The bulk import posts the uploaded file to a server action, and a
    * spreadsheet travels base64-encoded because it is a zip archive rather than
    * text — about a third larger than the 512 KB the importer accepts. The

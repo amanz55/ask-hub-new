@@ -1864,7 +1864,7 @@ export const SITE_CONTENT: readonly SeedSiteContent[] = [
     // attribution verbatim, and makes no curation claim — so `identity_lead`
     // remains the single place that states it (rule 10.8).
     value:
-      "The open directory for Africa's AI ecosystem — connecting innovators to the compute, funding, training, accelerators, and partnerships of the AI Hub for Sustainable Development, co-led by MIMIT and UNDP",
+      "An open directory for discovering compute, funding, training, accelerators, and partnerships opportunities. Curated by the AI Hub for Sustainable Development, co-led by Italy’s Ministry of Enterprises and Made in Italy (MIMIT) and the United Nations Development Programme (UNDP).",
   },
   {
     key: 'welcome_cta',

@@ -10,8 +10,8 @@ vi.mock('next/navigation', () => ({ useSearchParams: () => params.current }));
 afterEach(cleanup);
 
 const entries: NeedMenuEntry[] = [
-  { need: 'compute', liveCount: 4, subCategories: [{ label: 'Cloud credits', liveCount: 2 }] },
-  { need: 'training', liveCount: 3, subCategories: [{ label: 'Curriculum', liveCount: 1 }] },
+  { need: 'compute', liveCount: 4, subCategories: [{ label: 'Cloud credits', liveCount: 2 }], moreSubCategories: [] },
+  { need: 'training', liveCount: 3, subCategories: [{ label: 'Curriculum', liveCount: 1 }], moreSubCategories: [] },
 ];
 
 /**
@@ -30,6 +30,12 @@ describe('the browse menu reading the URL', () => {
     render(<BrowseByNeedClient entries={entries} />);
     expect(screen.getByRole('link', { name: /Curriculum/ })).toBeDefined();
     expect(screen.queryByRole('link', { name: /Cloud credits/ })).toBeNull();
+  });
+
+  it('marks the sub-category the URL is filtered to', () => {
+    params.current = new URLSearchParams('need=training&sub=Curriculum');
+    render(<BrowseByNeedClient entries={entries} />);
+    expect(screen.getByRole('link', { name: /Curriculum/ }).getAttribute('aria-current')).toBe('true');
   });
 
   it('expands nothing when no need is filtered', () => {

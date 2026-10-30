@@ -1,15 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, within } from '@testing-library/react';
 import SiteHeader from '@/components/public/SiteHeader';
-
-// SearchPill is a client component that calls useRouter. The header's own
-// assertions are about its links, so the router is stubbed rather than the
-// pill being torn out of the tree -- a header rendered without its search
-// field is not the header under test.
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-}));
 
 afterEach(cleanup);
 
@@ -50,6 +42,12 @@ describe('the public header', () => {
     // second route on offer.
     render(<SiteHeader />);
     expect(navItems()).toEqual(['/', '/contact']);
+  });
+
+  it('has no search of its own, since the directory has the one search box', () => {
+    render(<SiteHeader />);
+    expect(screen.queryByRole('search')).toBeNull();
+    expect(screen.queryByRole('searchbox')).toBeNull();
   });
 
   it('styles Contact as a nav item, not as an outlined action', () => {

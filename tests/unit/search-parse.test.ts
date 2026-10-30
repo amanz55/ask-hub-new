@@ -182,3 +182,42 @@ describe('applyParsedQuery', () => {
     expect(next.query).toBe('zindi');
   });
 });
+
+describe('the searches the client reported', () => {
+  it('keeps only meaningful leftovers from a full sentence', () => {
+    expect(parseQuery('I need to learn about AI to grow in my career')).toMatchObject({
+      need: 'training',
+      query: 'grow career',
+    });
+    expect(parseQuery('I need to learn about AI to grow my water startup')).toMatchObject({
+      need: 'training',
+      sector: 'Water',
+      query: 'grow',
+    });
+  });
+
+  it('moves to Best match when there is something to rank on, but not over a chosen sort', () => {
+    expect(applyParsedQuery(EMPTY_CRITERIA, 'grow my career').sort).toBe('best');
+    expect(applyParsedQuery(EMPTY_CRITERIA, 'water').sort).toBe('best');
+    expect(applyParsedQuery(EMPTY_CRITERIA, 'grants in kenya').sort).toBe(EMPTY_CRITERIA.sort);
+    expect(applyParsedQuery({ ...EMPTY_CRITERIA, sort: 'recent' }, 'career').sort).toBe('recent');
+  });
+
+  it('does not read a subject as a request for a course', () => {
+    expect(parseQuery('machine learning dataset')).toMatchObject({
+      need: 'data',
+      query: 'machine learning',
+    });
+  });
+
+  it('resolves the added stage phrases', () => {
+    expect(parseQuery('early stage')).toMatchObject({ stage: 'Getting started', query: '' });
+    expect(parseQuery('growth stage')).toMatchObject({ stage: 'Scaling', query: '' });
+  });
+
+  it('follows up by replacing the words and keeping the filters', () => {
+    const first = applyParsedQuery(EMPTY_CRITERIA, 'grants in kenya for farmers');
+    const next = applyParsedQuery(first, 'women');
+    expect(next).toMatchObject({ need: 'funding', country: 'Kenya', query: 'women' });
+  });
+});

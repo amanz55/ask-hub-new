@@ -6,16 +6,22 @@ import { t } from '@/lib/i18n';
 import ResourceGrid, { DIRECTORY_SECTION, DIRECTORY_HEADING } from './ResourceGrid';
 import Pagination from './Pagination';
 import FilterControls from './FilterControls';
+import NoResultsHelp from './NoResultsHelp';
 import ExportButton from './ExportButton';
 import {
   parseFilters,
   paginate,
   resetPageOnFilterChange,
+  anyRowMatchesQuery,
+  arrangeResources,
   directoryHref,
+  dropUnknownSubCategory,
   filterResources,
-  sortResources,
+  hasFacet,
+  recoveryOptions,
   type FilterCriteria,
 } from '@/lib/public/filters';
+import { subCategoriesFor } from '@/lib/public/need-menu';
 import type { PublicResource } from '@/lib/public/types';
 
 /**
@@ -52,7 +58,19 @@ export default function ResourceDirectoryClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const criteria = parseFilters(searchParams);
+  const parsed = parseFilters(searchParams);
+
+  // Everything the selected need offers, not just the rail's first four: the
+  // dropdown is the one place all of them can be reached. Taken from the need
+  // alone, so choosing a country does not make options vanish from this list.
+  const subCategories = useMemo(
+    () =>
+      parsed.need === null
+        ? []
+        : subCategoriesFor(resources, parsed.need).map((sub) => sub.label),
+    [resources, parsed.need],
+  );
+  const criteria = dropUnknownSubCategory(parsed, subCategories);
 
   // Depend on the individual primitive fields, not on `criteria` itself:
   // `parseFilters` returns a fresh object on every render, so memoising on
@@ -60,11 +78,12 @@ export default function ResourceDirectoryClient({
   // memo that implies a guarantee it does not provide. `criteria` itself is
   // deliberately left out of the dependency array for that reason.
   const visible = useMemo(
-    () => sortResources(filterResources(resources, criteria), criteria.sort),
+    () => arrangeResources(filterResources(resources, criteria), criteria),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       resources,
       criteria.need,
+      criteria.subCategory,
       criteria.sector,
       criteria.country,
       criteria.stage,
@@ -104,10 +123,29 @@ export default function ResourceDirectoryClient({
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <FilterControls criteria={criteria} resultCount={visible.length} onChange={apply} />
+        <FilterControls
+          criteria={criteria}
+          subCategories={subCategories}
+          resultCount={visible.length}
+          noTextMatch={
+            criteria.query !== '' &&
+            hasFacet(criteria) &&
+            visible.length > 0 &&
+            !anyRowMatchesQuery(visible, criteria.query)
+          }
+          onChange={apply}
+        />
       </div>
 
-      <ResourceGrid resources={shown.rows} allCount={resources.length} />
+      <ResourceGrid
+        resources={shown.rows}
+        allCount={resources.length}
+        emptyContent={
+          visible.length === 0 ? (
+            <NoResultsHelp criteria={criteria} options={recoveryOptions(resources, criteria)} />
+          ) : null
+        }
+      />
       <Pagination criteria={criteria} page={shown.page} pageCount={shown.pageCount} />
     </section>
   );

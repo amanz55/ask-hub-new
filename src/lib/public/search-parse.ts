@@ -1,5 +1,6 @@
 import { COUNTRIES, SECTORS, STAGES, NEED_KEYS, type NeedKey } from '@/lib/reference';
-import type { FilterCriteria } from './filters';
+import { DEFAULT_SORT, type FilterCriteria } from './filters';
+import { normalise } from './search-rank';
 
 type Sector = (typeof SECTORS)[number];
 type Stage = (typeof STAGES)[number];
@@ -24,7 +25,20 @@ const STOP_WORDS: ReadonlySet<string> = new Set([
   'for', 'in', 'the', 'a', 'an', 'to', 'of', 'and', 'with', 'on', 'ai', 'me',
   'my', 'find', 'need', 'looking', 'want', 'startup', 'startups', 'africa',
   'african', 'resources', 'help',
+  // Added to the prototype's list: the grammar of a full sentence, which would
+  // otherwise be ranked on as if it described what the visitor is after.
+  'about', 'how', 'what', 'where', 'which', 'who', 'can', 'are', 'you', 'your',
+  'our', 'this', 'that', 'these', 'those', 'from', 'into', 'get', 'give', 'some',
+  'any', 'would', 'like', 'please', 'have', 'has', 'there', 'will', 'was',
+  'resource', 'opportunity', 'opportunities',
 ]);
+
+/**
+ * Subjects containing a word the tables below claim. "machine learning course"
+ * is a course either way, but "machine learning dataset" must not become
+ * Courses because of "learning". These stay whole, as words to rank on.
+ */
+const SUBJECT_PHRASES: readonly string[] = ['machine learning', 'deep learning'];
 
 /**
  * Every need, and the words a visitor types for it.
@@ -36,9 +50,9 @@ const STOP_WORDS: ReadonlySet<string> = new Set([
  */
 const NEED_SYNONYMS: Record<NeedKey, readonly string[]> = {
   compute: ['compute', 'gpus', 'gpu', 'cloud credits', 'cloud', 'credits'],
-  training: ['training', 'courses', 'course', 'curriculum', 'learning', 'learn', 'skills'],
-  funding: ['funding', 'grants', 'grant', 'investment'],
-  accelerator: ['accelerators', 'accelerator', 'incubator'],
+  training: ['training', 'courses', 'course', 'curriculum', 'learning', 'learn', 'skills', 'bootcamp'],
+  funding: ['funding', 'funds', 'fund', 'grants', 'grant', 'investment'],
+  accelerator: ['accelerators', 'accelerator', 'incubators', 'incubator', 'incubation'],
   // Not in the prototype's table, which drops Partners from its public
   // category list. Ours keeps it -- it is one of the eight the Need dropdown
   // offers -- so the parser has to be able to reach it too, or typing the name
@@ -58,14 +72,14 @@ const SECTOR_SYNONYMS: Record<Sector, readonly string[]> = {
 };
 
 const STAGE_SYNONYMS: Record<Stage, readonly string[]> = {
-  'New to AI': ['new to ai', 'beginner'],
-  'Getting started': ['getting started'],
+  'New to AI': ['new to ai', 'beginners', 'beginner'],
+  'Getting started': ['getting started', 'early stage'],
   // Deliberately empty, and not an oversight: "building" is a verb before it
   // is a stage. "building a startup" and "capacity building" would both land
   // here, and a filter nobody asked for is worse than one word that does not
   // resolve. The Stage dropdown still offers it.
   Building: [],
-  Scaling: ['scaling'],
+  Scaling: ['scaling', 'scale', 'growth stage'],
 };
 
 /** Names people type that are not the country's canonical spelling. */
@@ -74,29 +88,6 @@ const COUNTRY_ALIASES: Record<string, Country> = {
   drc: 'Democratic Republic of the Congo',
   congo: 'Democratic Republic of the Congo',
 };
-
-/**
- * Lowercase, strip accents, reduce everything that is not a letter or digit to
- * a single space, and pad with one space at each end.
- *
- * Applied to the query and to every phrase, so the two are always compared in
- * the same alphabet. The prototype does none of this and does not need to --
- * its own country list is plain ASCII. Ours is not: `Côte d'Ivoire` carries
- * both an accent and an apostrophe, and a raw `includes` would mean the one
- * country whose name is hard to type is the one country that never matches.
- *
- * The apostrophe becoming a space is why "cote d'ivoire" and "cote d ivoire"
- * both resolve while "cote divoire" does not.
- */
-function normalise(value: string): string {
-  const flattened = value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}+/gu, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-  return ` ${flattened} `;
-}
 
 interface Candidate {
   readonly phrase: string;
@@ -149,6 +140,12 @@ const CANDIDATES: readonly Candidate[] = [
  */
 export function parseQuery(raw: string): ParsedQuery {
   let rest = normalise(raw);
+  const subjects: string[] = [];
+  for (const phrase of SUBJECT_PHRASES) {
+    if (!rest.includes(` ${phrase} `)) continue;
+    rest = ` ${rest.split(` ${phrase} `).join('  ').trim()} `;
+    subjects.push(phrase);
+  }
   const found: Record<Candidate['facet'], string | null> = {
     need: null,
     sector: null,
@@ -171,7 +168,7 @@ export function parseQuery(raw: string): ParsedQuery {
     sector: found.sector,
     stage: found.stage,
     country: found.country,
-    query: words.join(' '),
+    query: [...subjects, ...words].join(' '),
   };
 }
 
@@ -187,19 +184,28 @@ export function parseQuery(raw: string): ParsedQuery {
  *
  * Page returns to 1: the result set has changed, so the page number a visitor
  * was on refers to a list that no longer exists.
+ *
+ * A search with something to rank on moves the default sort to Best match. A
+ * sort the visitor chose for themselves is left alone.
  */
 export function applyParsedQuery(
   criteria: FilterCriteria,
   raw: string,
 ): FilterCriteria {
   const parsed = parseQuery(raw);
+  const need = parsed.need ?? criteria.need;
+  const ranks = parsed.query !== '' || parsed.sector !== null;
   return {
     ...criteria,
-    need: parsed.need ?? criteria.need,
+    need,
+    // A sub-category belongs to its need, so a search that moves to another
+    // need cannot carry it along.
+    subCategory: need === criteria.need ? criteria.subCategory : null,
     sector: parsed.sector ?? criteria.sector,
     stage: parsed.stage ?? criteria.stage,
     country: parsed.country ?? criteria.country,
     query: parsed.query,
+    sort: ranks && criteria.sort === DEFAULT_SORT ? 'best' : criteria.sort,
     page: 1,
   };
 }

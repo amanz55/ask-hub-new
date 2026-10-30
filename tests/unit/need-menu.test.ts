@@ -279,6 +279,7 @@ describe('which sub-categories an entry carries', () => {
       need: 'accelerator',
       liveCount: 1,
       subCategories: [],
+      moreSubCategories: [],
     });
   });
 

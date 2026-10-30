@@ -1,13 +1,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { t } from '@/lib/i18n';
-import SearchPill from './SearchPill';
 
 /**
  * Transcribed from the approved prototype
  * (the approved prototype): a sticky white rail with a 1px hairline, 1180px wide, 68px
- * tall, carrying the roundel and wordmark on the left, the search pill in the
- * middle, and the navigation on the right.
+ * tall, carrying the roundel and wordmark on the left and the navigation on the
+ * right.
+ *
+ * **The prototype's search pill is gone, at the client's request.** It repeated
+ * the directory's own search box, so the directory is now the one place to
+ * search.
  *
  * **The one thing not transcribed: the ADMIN button.** The prototype ends the
  * rail with an outlined ADMIN button linking to the portal. PRD 5.8 forbids
@@ -29,16 +32,14 @@ import SearchPill from './SearchPill';
  * directory screen. Here the directory is a band on the home page (PRD 5.1
  * item 8), so the item was an in-page jump to #directory sitting one slot
  * away from Home, which scrolls to the top of the same page -- two nav items
- * for one document. The directory is reached from the browse menu, the search
- * pill, the welcome CTA and the footer, all of which target it directly.
+ * for one document. The directory is reached from the browse menu, the welcome
+ * CTA and the footer, all of which target it directly.
  * `nav.directory` stays in en.json because the footer still labels a link
  * with it.
  *
  * **On the wordmark.** `site.wordmark` is "AskHub", the product's own name,
  * as against the programme -- the AI Hub for Sustainable Development -- which
- * CLAUDE.md requires be named in full wherever it appears. The prototype
- * hides this word below 640px so the roundel and pill still fit on one row;
- * `.askhub-wordmark` in globals.css is that rule, transcribed with it.
+ * CLAUDE.md requires be named in full wherever it appears.
  *
  * The mark is a local asset, so this uses next/image (which fingerprints and
  * sizes it) rather than the bare <img> PartnerRow needs for arbitrary remote
@@ -93,7 +94,6 @@ export default function SiteHeader() {
             priority
           />
           <span
-            className="askhub-wordmark"
             style={{
               fontSize: 22,
               fontWeight: 800,
@@ -105,25 +105,14 @@ export default function SiteHeader() {
           </span>
         </Link>
 
-        <div
-          style={{
-            flex: '1 1 220px',
-            display: 'flex',
-            justifyContent: 'center',
-            minWidth: 0,
-          }}
-        >
-          <SearchPill />
-        </div>
-
         <ul
           style={{
+            marginLeft: 'auto',
             display: 'flex',
             alignItems: 'center',
             gap: 4,
             flexWrap: 'wrap',
             listStyle: 'none',
-            margin: 0,
             padding: 0,
           }}
         >

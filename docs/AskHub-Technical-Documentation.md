@@ -395,7 +395,7 @@ All in `src/lib/public/`, pure functions over the cached list of live resources,
 |---|---|---|
 | URL → criteria | `parseFilters(params)` | Reads `need`, `sector`, `country`, `stage`, `q`, `sort`, `page`; unknown values fall back to defaults; `page` accepts digits only |
 | Plain language | `parseQuery(q)` | Tokenises; maps synonyms to a need (`grants` → funding, `courses` → training…), a sector, a stage, a country alias; strips stop words; the leftover words become the text query |
-| Filter | `filterResources(rows, criteria)` | Need matches primary or secondary; sector/stage lists match when empty ("open to all") or containing the value; country matches unless scope is `specific` and the list excludes it; every leftover word must appear in name, provider, description or sub-category |
+| Filter | `filterResources(rows, criteria)` | Need matches primary or secondary; sub-category matches the trimmed field exactly, and is only set alongside a need; sector/stage lists match when empty ("open to all") or containing the value; country matches unless scope is `specific` and the list excludes it; leftover words rank results and exclude only when no facet is set, where at least one must appear in name, provider, description or sub-category |
 | Sort | `sortResources(rows, mode)` | `featured`: featured first, then `sort_order`, then id; `recent`: `added_date` desc, then id — ties broken deterministically to avoid hydration mismatch |
 | Page | `paginate(rows, page, 12)` | Clamps to an existing page |
 | Criteria → URL | `toSearchParams`, `directoryHref`, `browseHref` | Omits defaults; page resets on any filter change (`resetPageOnFilterChange`) |

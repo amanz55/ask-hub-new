@@ -1,14 +1,20 @@
 import { COUNTRIES, SECTORS, STAGES, NEED_KEYS } from '@/lib/reference';
+import { queryTerms, scoreResource } from './search-rank';
 import type { NeedKey, PublicResource } from './types';
 
-export type SortMode = 'featured' | 'recent';
+export type SortMode = 'featured' | 'recent' | 'best';
 
-const SORT_MODES: readonly SortMode[] = ['featured', 'recent'];
+const SORT_MODES: readonly SortMode[] = ['featured', 'recent', 'best'];
 
 export const DEFAULT_SORT: SortMode = 'featured';
 
 export interface FilterCriteria {
   need: NeedKey | null;
+  /**
+   * Refines `need`, so it is only ever set alongside one. Free text with no
+   * reference list behind it: see `dropUnknownSubCategory`.
+   */
+  subCategory: string | null;
   sector: string | null;
   country: string | null;
   stage: string | null;
@@ -23,6 +29,7 @@ export const PAGE_SIZE = 12;
 
 export const EMPTY_CRITERIA: FilterCriteria = {
   need: null,
+  subCategory: null,
   sector: null,
   country: null,
   stage: null,
@@ -58,13 +65,20 @@ function oneOf<T extends string>(
  * screen explaining why.
  */
 export function parseFilters(params: ReadableParams): FilterCriteria {
+  const need = oneOf<NeedKey>(params.get('need'), NEED_KEYS);
+  const sector = oneOf(params.get('sector'), SECTORS);
+  const query = (params.get('q') ?? '').trim();
+  const sort = oneOf<SortMode>(params.get('sort'), SORT_MODES) ?? DEFAULT_SORT;
   return {
-    need: oneOf<NeedKey>(params.get('need'), NEED_KEYS),
-    sector: oneOf(params.get('sector'), SECTORS),
+    need,
+    // Meaningless without its need: a sub-category is a refinement of one.
+    subCategory: need === null ? null : params.get('sub')?.trim() || null,
+    sector,
     country: oneOf(params.get('country'), COUNTRIES),
     stage: oneOf(params.get('stage'), STAGES),
-    query: (params.get('q') ?? '').trim(),
-    sort: oneOf<SortMode>(params.get('sort'), SORT_MODES) ?? DEFAULT_SORT,
+    query,
+    // Best match means nothing once the words it ranks on are gone.
+    sort: sort === 'best' && rankTerms({ query, sector }).length === 0 ? DEFAULT_SORT : sort,
     page: pageFrom(params.get('page')),
   };
 }
@@ -95,6 +109,25 @@ function pageFrom(raw: string | null): number {
 }
 
 /**
+ * Drop a selected sub-category that the current need does not offer.
+ *
+ * The rule `parseFilters` applies to every other facet, which it cannot apply
+ * here: sub-categories are discovered from the live rows rather than listed in
+ * reference.ts, so only a caller holding those rows can tell a stale link from
+ * a real one. Without this, a link to a sub-category since retired would open
+ * an empty directory (FR-025).
+ */
+export function dropUnknownSubCategory(
+  criteria: FilterCriteria,
+  offered: readonly string[],
+): FilterCriteria {
+  if (criteria.subCategory === null || offered.includes(criteria.subCategory)) {
+    return criteria;
+  }
+  return { ...criteria, subCategory: null };
+}
+
+/**
  * Write filter state back to the URL.
  *
  * `base` carries anything already in the query string that is not ours --
@@ -113,11 +146,15 @@ export function toSearchParams(
     else out.set(key, value);
   };
   set('need', criteria.need);
+  set('sub', criteria.subCategory);
   set('sector', criteria.sector);
   set('country', criteria.country);
   set('stage', criteria.stage);
   set('q', criteria.query.trim());
-  set('sort', criteria.sort === DEFAULT_SORT ? null : criteria.sort);
+  const sortIsDefault =
+    criteria.sort === DEFAULT_SORT ||
+    (criteria.sort === 'best' && rankTerms(criteria).length === 0);
+  set('sort', sortIsDefault ? null : criteria.sort);
   // Page 1 is the default, so it is left out: a first-page link should be the
   // bare link, not `?page=1`, or every shared URL carries a parameter that
   // means nothing and survives every later copy of it.
@@ -143,6 +180,7 @@ export function resetPageOnFilterChange(
 ): FilterCriteria {
   const changed =
     next.need !== previous.need ||
+    next.subCategory !== previous.subCategory ||
     next.sector !== previous.sector ||
     next.country !== previous.country ||
     next.stage !== previous.stage ||
@@ -206,14 +244,10 @@ export function directoryHref(
 /**
  * The same URL as `directoryHref`, without the `#directory` fragment.
  *
- * For the browse menu's category rows. Opening a category is a request to see
- * what is inside it, and the sub-categories appear in the menu itself -- but
- * the fragment scrolled the viewport straight past them to the results, so
- * the sub-categories a click had just revealed were never in view. The
- * filtering still happens; only the jump is dropped.
- *
- * The sub-category rows keep the fragment: choosing one is a request for the
- * matching resources, and there is nothing further to reveal in the menu.
+ * For the browse menu's category and sub-category rows. Selecting either
+ * changes the menu and the rail beside it, and the fragment scrolled the
+ * viewport straight past both to the results, so what a click had just changed
+ * was never in view. The filtering still happens; only the jump is dropped.
  *
  * Built from the same `toSearchParams`, so a category row and a chip
  * expressing the same selection still serialise identically.
@@ -239,6 +273,15 @@ function matchesList(eligible: readonly string[], selected: string | null): bool
 }
 
 /**
+ * The same reading of `sub_category` the browse menu counts by: trimmed and
+ * exact. So a sub-item reading "3" leads to exactly three cards, where a text
+ * search for the same words would also catch any row that merely mentions them.
+ */
+function matchesSubCategory(row: PublicResource, selected: string | null): boolean {
+  return selected === null || row.subCategory?.trim() === selected;
+}
+
+/**
  * Content rule 10.6: the country filter has no catch-all option. A resource
  * whose geo_scope is global, all_africa or partner_countries matches every
  * country selection; only `specific` consults countries_eligible.
@@ -249,31 +292,47 @@ function matchesCountry(row: PublicResource, selected: string | null): boolean {
   return matchesList(row.countriesEligible, selected);
 }
 
+/** Whether anything other than search text is narrowing the directory. */
+export function hasFacet(
+  criteria: Pick<FilterCriteria, 'need' | 'subCategory' | 'sector' | 'stage' | 'country'>,
+): boolean {
+  return (
+    criteria.need !== null ||
+    criteria.subCategory !== null ||
+    criteria.sector !== null ||
+    criteria.stage !== null ||
+    criteria.country !== null
+  );
+}
+
 /**
- * Every word has to appear somewhere, rather than the whole string appearing
- * intact in one field -- the prototype's `textMatch`.
- *
- * The searchable text is the four fields joined, so the words may be spread
- * across them: "aws compute" matches a resource named "Activate" from partner
- * "Amazon Web Services" described as compute credits, which a
- * contiguous-phrase match in a single field could never find. A one-word
- * query behaves exactly as it did before.
- *
- * What reaches here is already the *leftover* of `parseQuery` — the words it
- * could not turn into a facet — so this is a search over prose, not a second
- * attempt at classification.
+ * What Best match ranks on: the search words, plus the selected sector's name.
+ * The sector counts because resources are rarely tagged with one, so a resource
+ * that talks about water should still come first under Water.
  */
-function matchesQuery(row: PublicResource, query: string): boolean {
-  if (query === '') return true;
-  const haystack = [row.name, row.partnerName, row.description, row.subCategory]
-    .filter((field): field is string => field !== null)
-    .join(' ')
-    .toLowerCase();
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((word) => word !== '')
-    .every((word) => haystack.includes(word));
+export function rankTerms(criteria: Pick<FilterCriteria, 'query' | 'sector'>): string[] {
+  return [...new Set([...queryTerms(criteria.query), ...queryTerms(criteria.sector ?? '')])];
+}
+
+/**
+ * Search words narrow the directory only when nothing else does.
+ *
+ * With a facet set, they rank and never exclude. They used to be required, so
+ * one word no resource used ("career") emptied a category that had 75 good
+ * answers, which read as the AI Hub having nothing to offer. With no facet they
+ * still have to match at least once, or a search for nonsense would return the
+ * entire directory looking like a result.
+ */
+function matchesQuery(row: PublicResource, criteria: FilterCriteria): boolean {
+  if (hasFacet(criteria)) return true;
+  const terms = queryTerms(criteria.query);
+  return terms.length === 0 || scoreResource(row, terms).matched > 0;
+}
+
+/** Whether any of these rows contains any of the search words. */
+export function anyRowMatchesQuery(rows: readonly PublicResource[], query: string): boolean {
+  const terms = queryTerms(query);
+  return rows.some((row) => scoreResource(row, terms).matched > 0);
 }
 
 /**
@@ -306,10 +365,11 @@ export function filterResources(
       (criteria.need === null ||
         row.needPrimary === criteria.need ||
         row.needSecondary === criteria.need) &&
+      matchesSubCategory(row, criteria.subCategory) &&
       matchesList(row.sectorsEligible, criteria.sector) &&
       matchesList(row.stagesEligible, criteria.stage) &&
       matchesCountry(row, criteria.country) &&
-      matchesQuery(row, criteria.query),
+      matchesQuery(row, criteria),
   );
 }
 
@@ -336,4 +396,99 @@ export function sortResources(
       a.sortOrder - b.sortOrder ||
       a.id.localeCompare(b.id),
   );
+}
+
+/**
+ * The directory's final order. Best match puts resources containing the most
+ * search words first, then those where the words sit in a stronger field. When
+ * the words do not decide it, a resource whose main category is the selected one
+ * beats one that only lists it as secondary. Remaining ties keep the featured
+ * order, so results stay stable between renders.
+ */
+export function arrangeResources(
+  rows: readonly PublicResource[],
+  criteria: FilterCriteria,
+): PublicResource[] {
+  const sorted = sortResources(rows, criteria.sort);
+  const terms = rankTerms(criteria);
+  if (criteria.sort !== 'best' || terms.length === 0) return sorted;
+  const scores = new Map(sorted.map((row) => [row.id, scoreResource(row, terms)]));
+  return sorted.sort((a, b) => {
+    const left = scores.get(a.id)!;
+    const right = scores.get(b.id)!;
+    return (
+      right.matched - left.matched ||
+      right.score - left.score ||
+      Number(b.needPrimary === criteria.need) - Number(a.needPrimary === criteria.need)
+    );
+  });
+}
+
+export type RecoveryOption =
+  | {
+      kind: 'remove';
+      facet: 'country' | 'stage' | 'sector' | 'subCategory' | 'query';
+      value: string;
+      count: number;
+      criteria: FilterCriteria;
+    }
+  | { kind: 'remove'; facet: 'need'; value: NeedKey; count: number; criteria: FilterCriteria }
+  | { kind: 'browse'; need: NeedKey; count: number; criteria: FilterCriteria }
+  | { kind: 'clearAll'; count: number; criteria: FilterCriteria };
+
+/**
+ * Specific ways out of an empty result, each with the number of resources it
+ * leads to. Geography comes first, as the most likely thing to broaden. A way
+ * out that would also be empty is left out.
+ */
+export function recoveryOptions(
+  rows: readonly PublicResource[],
+  criteria: FilterCriteria,
+): RecoveryOption[] {
+  const count = (next: FilterCriteria) => filterResources(rows, next).length;
+  const base: FilterCriteria = { ...criteria, page: 1 };
+  const options: RecoveryOption[] = [];
+  const remove = (
+    facet: 'country' | 'stage' | 'sector' | 'subCategory' | 'query',
+    value: string | null,
+    next: FilterCriteria,
+  ) => {
+    if (value) options.push({ kind: 'remove', facet, value, count: count(next), criteria: next });
+  };
+
+  remove('country', criteria.country, { ...base, country: null });
+  remove('stage', criteria.stage, { ...base, stage: null });
+  remove('sector', criteria.sector, { ...base, sector: null });
+  remove('subCategory', criteria.subCategory, { ...base, subCategory: null });
+  if (criteria.need) {
+    const next: FilterCriteria = { ...base, need: null, subCategory: null };
+    options.push({ kind: 'remove', facet: 'need', value: criteria.need, count: count(next), criteria: next });
+  }
+  remove('query', criteria.query, { ...base, query: '' });
+  // Only a search with no facet can leave a visitor with no category to loosen.
+  if (!hasFacet(criteria)) {
+    const browse = NEED_KEYS.map((need) => {
+      const next: FilterCriteria = { ...base, query: '', need };
+      return { kind: 'browse' as const, need, count: count(next), criteria: next };
+    }).sort((a, b) => b.count - a.count);
+    options.push(...browse.slice(0, 3));
+  }
+  // Several constraints can empty the list together, leaving no single removal
+  // that helps. With only one, removing it already is clearing everything.
+  const active = [
+    criteria.need,
+    criteria.subCategory,
+    criteria.sector,
+    criteria.stage,
+    criteria.country,
+    criteria.query || null,
+  ].filter((value) => value !== null).length;
+  if (active > 1) {
+    options.push({
+      kind: 'clearAll',
+      count: count(EMPTY_CRITERIA),
+      criteria: { ...EMPTY_CRITERIA },
+    });
+  }
+  return options.filter((option) => option.count > 0);
 }
