@@ -32,7 +32,7 @@ function openPanel() {
 }
 
 describe('ShareModal copy', () => {
-  it('reports success and writes the share text to the clipboard', async () => {
+  it('reports success and writes only the link to the clipboard', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     withClipboard({ writeText });
     openPanel();
@@ -40,10 +40,9 @@ describe('ShareModal copy', () => {
     fireEvent.click(screen.getByText(t('share.copyLink')));
 
     await waitFor(() => expect(screen.getByText(t('share.copied'))).toBeTruthy());
+    // Anything beside the URL stops it working when pasted into an address bar.
     expect(writeText).toHaveBeenCalledTimes(1);
-    const written = writeText.mock.calls[0]?.[0] as string;
-    expect(written).toContain(URL_UNDER_TEST);
-    expect(written).toContain(TITLE);
+    expect(writeText).toHaveBeenCalledWith(URL_UNDER_TEST);
     expect(screen.queryByText(t('share.copyFailed'))).toBeNull();
   });
 
@@ -74,14 +73,13 @@ describe('ShareModal copy', () => {
     expect(screen.queryByText(t('share.copied'))).toBeNull();
   });
 
-  it('offers the full share text, selected, so it can be copied by hand', async () => {
+  it('offers the link, selected, so it can be copied by hand', async () => {
     withClipboard({ writeText: vi.fn().mockRejectedValue(new Error('denied')) });
     openPanel();
     fireEvent.click(screen.getByText(t('share.copyLink')));
 
     const fallback = (await screen.findByLabelText(t('share.manualCopy'))) as HTMLTextAreaElement;
-    expect(fallback.value).toContain(URL_UNDER_TEST);
-    expect(fallback.value).toContain(TITLE);
+    expect(fallback.value).toBe(URL_UNDER_TEST);
     expect(document.activeElement).toBe(fallback);
     expect(fallback.selectionStart).toBe(0);
     expect(fallback.selectionEnd).toBe(fallback.value.length);
@@ -176,6 +174,7 @@ describe('ShareModal LinkedIn', () => {
 
     await waitFor(() => expect(open).toHaveBeenCalled());
     expect(screen.getByText(t('share.copyFailed'))).toBeTruthy();
+    expect((screen.getByLabelText(t('share.manualCopy')) as HTMLTextAreaElement).value).toBe(body);
   });
 
   it('copies as well as opening the share sheet on a touch device', async () => {

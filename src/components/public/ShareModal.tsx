@@ -23,6 +23,7 @@ export default function ShareModal({ url, title }: { url: string; title: string 
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState(t('share.defaultText'));
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [manualText, setManualText] = useState('');
   const fallbackRef = useRef<HTMLTextAreaElement>(null);
 
   const body = `${message}\n\n${title}\n${url}`;
@@ -40,14 +41,15 @@ export default function ShareModal({ url, title }: { url: string; title: string 
    * Neither is exceptional enough to surface as an error, but neither may be
    * swallowed: the previous version left the label reading "Copy link" with no
    * clipboard write and no explanation. The catch shows the failure and puts
-   * the full share text on screen, selected, so the reader can copy it by
-   * hand; that fallback needs no permission and no secure context.
+   * the same text on screen, selected, so the reader can copy it by hand; that
+   * fallback needs no permission and no secure context.
    */
-  async function copy() {
+  async function copy(text: string) {
     try {
-      await navigator.clipboard.writeText(body);
+      await navigator.clipboard.writeText(text);
       setCopyState('copied');
     } catch {
+      setManualText(text);
       setCopyState('failed');
     }
   }
@@ -79,7 +81,7 @@ export default function ShareModal({ url, title }: { url: string; title: string 
         if (error instanceof DOMException && error.name === 'AbortError') return;
       }
     } else {
-      await copy();
+      await copy(body);
     }
     // Without `noopener`, which would make a blocked tab undetectable: opening
     // after an await is what a popup blocker may refuse, and then the visitor
@@ -155,7 +157,7 @@ export default function ShareModal({ url, title }: { url: string; title: string 
         />
       </label>
       <div className="mt-3 flex flex-wrap gap-3 text-sm">
-        <button type="button" className="text-primary underline" onClick={() => void copy()}>
+        <button type="button" className="text-primary underline" onClick={() => void copy(url)}>
           {copyState === 'copied' ? t('share.copied') : t('share.copyLink')}
         </button>
         <a
@@ -195,7 +197,7 @@ export default function ShareModal({ url, title }: { url: string; title: string 
             className="mt-1 w-full rounded-lg border border-hairline p-3 text-navy"
             rows={4}
             readOnly
-            value={body}
+            value={manualText}
           />
         </div>
       ) : null}
