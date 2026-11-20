@@ -37,13 +37,14 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
-        // The AI Hub website's programmes page links its "New to compute?"
-        // card here, but this address was never an AskHub page -- it was
-        // meant for the AI Hub website's Compute Curious programme page. A
-        // site crawl reported it as a 404. Redirected here so the link works
-        // while the AI Hub website corrects it at the source.
+        // Some language versions of the AI Hub website's programmes page link
+        // here (sw/pt/ar from the "New to compute?" card, fr/it from the
+        // Compute Accelerator card), but this was never an AskHub page. A site
+        // crawl reported it as a 404. The Compute Accelerator Programme page
+        // fits both cards, so the link works while the AI Hub website
+        // corrects it at the source.
         source: '/compute-accelerator',
-        destination: 'https://aihubfordevelopment.org/programmes/compute-curious',
+        destination: 'https://aihubfordevelopment.org/programmes/compute-accelerator-programme',
         permanent: true,
       },
     ];
