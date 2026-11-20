@@ -40,6 +40,17 @@ on its own.
 
 ## 2. Why it is gated
 
+> **Update 2026-11-20: indexing is enabled on Production** at the project
+> manager's request. `src/lib/indexing.ts` decides it per deployment: Vercel
+> Production drops the `X-Robots-Tag` header and serves `index, follow`
+> metadata, and Preview and Development keep `noindex, nofollow`. `/admin` is
+> `noindex` in every environment. `src/app/robots.ts` and `src/app/sitemap.ts`
+> serve `robots.txt` and `sitemap.xml`. The sitemap leaves out closed
+> resources and `/impact`. `NEXT_PUBLIC_SITE_URL` must be set on Production,
+> or both files will contain relative URLs. The rest of this section records
+> the earlier gated posture. The content items in Section 5's checklist were
+> not re-verified when indexing was turned on.
+
 Two independent mechanisms keep this build out of search, plus one operator
 setting that keeps it out of the public's hands entirely. All three must
 stay on together — removing one while the others remain is still a failure

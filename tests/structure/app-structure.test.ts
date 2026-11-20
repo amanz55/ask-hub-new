@@ -91,8 +91,8 @@ describe('globals.css', () => {
 describe('root layout', () => {
   const layout = readFileSync('src/app/layout.tsx', 'utf8');
 
-  it('sets noindex metadata for the gated review deploy', () => {
-    expect(layout).toMatch(/robots:\s*\{\s*index:\s*false/);
+  it('gates robots metadata on the deployment environment', () => {
+    expect(layout).toMatch(/robots:\s*isIndexable\(\)/);
   });
 
   it('does not import a font from next/font/google', () => {

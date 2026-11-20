@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { isIndexable } from './src/lib/indexing';
 
 const nextConfig: NextConfig = {
   /**
@@ -46,10 +47,19 @@ const nextConfig: NextConfig = {
           // Design doc 5.7. The full header set — CSP, HSTS with
           // includeSubDomains, frame-ancestors, Permissions-Policy — is SP4.
           // These three cost nothing and need no GA4 compatibility work.
-          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // Production is indexable; every other deployment is not. See
+          // src/lib/indexing.ts, which the root layout and robots.ts share.
+          ...(isIndexable()
+            ? []
+            : [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]),
         ],
+      },
+      {
+        // The admin portal is never indexed, in any environment.
+        source: '/admin/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       },
     ];
   },

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { getCurrentUser } from '@/lib/auth';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminFooter from '@/components/admin/AdminFooter';
@@ -27,6 +28,9 @@ import AdminFooter from '@/components/admin/AdminFooter';
  * be present at *runtime* on any deploy for the pages to work at all.
  */
 export const dynamic = 'force-dynamic';
+
+/** The admin portal is never indexed, whatever the root layout allows. */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function AdminLayout({
   children,

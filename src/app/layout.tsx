@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { t } from '@/lib/i18n';
+import { isIndexable } from '@/lib/indexing';
 
 export const metadata: Metadata = {
   // From the locale file, not inline: <title> and <meta description> are
   // user-facing. SP1 Task 2 adds the self-hosted Outfit preload below.
   title: t('site.name'),
   description: t('site.tagline'),
-  // Design doc 5.7: this build ships behind Vercel Deployment Protection
-  // with no CSP, no Turnstile and no rate limiting. It must not be indexed.
-  robots: { index: false, follow: false },
+  // Production is indexable; Preview and Development deployments are not
+  // (see src/lib/indexing.ts). The admin layout overrides this to noindex.
+  robots: isIndexable()
+    ? { index: true, follow: true }
+    : { index: false, follow: false },
 };
 
 export default function RootLayout({
