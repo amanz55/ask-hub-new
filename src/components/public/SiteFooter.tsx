@@ -125,31 +125,11 @@ const CO_LEAD_LINKS = [
 ] as const;
 
 /**
- * The AI Hub's programmes, on the AI Hub's own site. These are destinations,
- * not directory entries: the footer names them and leaves the reader on
- * aihubfordevelopment.org, which is why none of them carries a figure. The
- * last has no page of its own yet and lands on the programmes index, exactly
- * as the prototype's own fallback does.
+ * The AI Hub's programmes index on its own site. A single link rather than a
+ * hand-kept list, at the client's request: a list here fell behind the AI Hub
+ * website as programmes were added, and the index page is always complete.
  */
-const PROGRAMME_LINKS = [
-  {
-    href: 'https://www.aihubfordevelopment.org/programmes/compute-accelerator-programme',
-    key: 'footer.programmeCompute',
-  },
-  {
-    href: 'https://www.aihubfordevelopment.org/programmes/ai-infrastructure-builder-program',
-    key: 'footer.programmeInfrastructure',
-  },
-  {
-    href: 'https://www.mimit.gov.it/en/media-tools/news/india-italy-and-africa-unite-to-bring-voice-ai-to-the-worlds-most-underserved-communities',
-    key: 'footer.programmeVoiceAi',
-  },
-  {
-    href: 'https://aihubfordevelopment.org/cyber4africa-programme',
-    key: 'footer.programmeCyber',
-  },
-
-] as const;
+const PROGRAMMES_INDEX_URL = 'https://aihubfordevelopment.org/ai-hub-programmes';
 
 /**
  * The programme's hashtags, closing the footer opposite the copyright, in the
@@ -276,18 +256,15 @@ export default function SiteFooter() {
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={COLUMN_HEADING}>{t('footer.programmes')}</div>
           <div style={COLUMN_LIST}>
-            {PROGRAMME_LINKS.map((link) => (
-              <a
-                key={link.key}
-                href={link.href}
-                target="_blank"
-                rel="noopener"
-                className="proto-footer-link"
-                style={COLUMN_LINK}
-              >
-                {t(link.key)}
-              </a>
-            ))}
+            <a
+              href={PROGRAMMES_INDEX_URL}
+              target="_blank"
+              rel="noopener"
+              className="proto-footer-link"
+              style={COLUMN_LINK}
+            >
+              {t('footer.programmesAll')}
+            </a>
           </div>
         </div>
 
@@ -336,10 +313,11 @@ export default function SiteFooter() {
       </div>
 
       {/* The AI Hub website's own closing band, transcribed from it rather
-          than from the prototype: a full-width rule, the translation
-          disclaimer, then the copyright with the programme's hashtags opposite.
-          Its type is that site's -- a 1px rule, 12px italic for the disclaimer
-          and 14px for the row -- but the text takes this footer's own
+          than from the prototype: a full-width rule, then the copyright with
+          the programme's hashtags opposite. The AI Hub website's
+          machine-translation disclaimer is deliberately left out, at the
+          client's request: AskHub is not machine-translated. Its type is that
+          site's -- a 1px rule and 14px for the row -- but the text takes this footer's own
           FOOTER_TEXT rather than that site's near-white, so the band reads as
           part of the columns above it and not as a strip borrowed from
           somewhere else. */}
@@ -354,9 +332,6 @@ export default function SiteFooter() {
         }}
       >
         <div style={{ height: 1, width: '100%', background: '#fff' }} />
-        <p style={{ margin: 0, fontSize: 12, fontStyle: 'italic', color: FOOTER_TEXT }}>
-          {t('footer.disclaimer')}
-        </p>
         <div
           style={{
             display: 'flex',

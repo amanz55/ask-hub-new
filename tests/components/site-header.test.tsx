@@ -44,6 +44,13 @@ describe('the public header', () => {
     expect(navItems()).toEqual(['/', '/contact']);
   });
 
+  it('links back to the AI Hub website, outside the nav item list', () => {
+    render(<SiteHeader />);
+    const back = screen.getByRole('link', { name: /Back to AI Hub/ });
+    expect(back.getAttribute('href')).toBe('https://aihubfordevelopment.org');
+    expect(back.closest('li')).toBeNull();
+  });
+
   it('has no search of its own, since the directory has the one search box', () => {
     render(<SiteHeader />);
     expect(screen.queryByRole('search')).toBeNull();

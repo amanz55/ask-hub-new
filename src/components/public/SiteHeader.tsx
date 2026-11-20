@@ -52,6 +52,8 @@ import { t } from '@/lib/i18n';
  * for a background colour would be a poor trade, so the nav item's hover is
  * the global class `.proto-nav-item`.
  */
+const AI_HUB_WEBSITE_URL = 'https://aihubfordevelopment.org';
+
 export default function SiteHeader() {
   return (
     <header
@@ -116,7 +118,9 @@ export default function SiteHeader() {
             padding: 0,
           }}
         >
-          <li>
+          {/* Hidden on phones (globals.css) so the back-to-AI-Hub button fits
+              on one row; the brand link beside it already goes home. */}
+          <li className="proto-nav-home">
             <Link
               href="/"
               className="proto-nav-item"
@@ -149,6 +153,39 @@ export default function SiteHeader() {
             </Link>
           </li>
         </ul>
+
+        {/* The way back to the AI Hub website, at the client's request.
+            Outside the nav item list on purpose: it leaves AskHub rather than
+            moving within it. Same tab, because AskHub is reached from that
+            site and this returns the visitor to it. Styled as the directory's
+            outlined secondary action (ExportButton), so it reads as a button
+            without competing with the page's primary actions. On phones the
+            label shortens to "AI Hub" (globals.css); the aria-label keeps
+            the full name for screen readers and contains both visible
+            labels, as WCAG 2.5.3 requires. */}
+        <a
+          href={AI_HUB_WEBSITE_URL}
+          aria-label={t('nav.aiHubWebsite')}
+          className="proto-back-to-hub"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 14,
+            fontWeight: 700,
+            color: '#1F5FBF',
+            background: '#fff',
+            border: '1.5px solid #C9D3E8',
+            borderRadius: 8,
+            padding: '7px 14px',
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span aria-hidden="true">←</span>
+          <span className="proto-back-full">{t('nav.aiHubWebsite')}</span>
+          <span className="proto-back-short">{t('nav.aiHubWebsiteShort')}</span>
+        </a>
       </nav>
     </header>
   );

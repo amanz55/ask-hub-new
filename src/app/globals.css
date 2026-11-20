@@ -225,6 +225,36 @@ button {
   background: #f1f4fa;
 }
 
+/* The header's "Back to AI Hub" button: the outlined secondary action takes
+   the primary border on hover, with the nav items' hover fill behind it. */
+.proto-back-to-hub:hover {
+  background: #f1f4fa !important;
+  border-color: #1f5fbf !important;
+}
+
+/* On phones the logo, Home, Contact and the full button do not fit on one
+   row, and a wrapped row makes the sticky header ~110px tall. So below 600px
+   Home is hidden (the brand link already goes home) and the button shortens
+   to "← AI Hub". Measured: one 69px row from 375px up; a 320px screen still
+   wraps to two rows. */
+.proto-back-short {
+  display: none;
+}
+@media (max-width: 599px) {
+  .proto-nav-home {
+    display: none;
+  }
+  .proto-back-full {
+    display: none;
+  }
+  .proto-back-short {
+    display: inline;
+  }
+  .proto-back-to-hub {
+    padding: 6px 10px !important;
+  }
+}
+
 /* Footer: links warm to the accent, the outlined
    partner badges take an accent border and full-white text. */
 .proto-footer-link {
